@@ -9,6 +9,7 @@ using HeaderTreeExplorer.Parser;
 namespace HeaderTreeExplorer
 {
     using Util = CppParserUtility;
+    using FileNode = TNode<CppParserUtility.FileParams>;
 
     static class FreqencyReport
     {
@@ -28,33 +29,34 @@ namespace HeaderTreeExplorer
         //Returns a list of files sorted in descending order of include frequency.
         public static FileInfo[] Generate(string[] filePaths, string[] libraryDirectories, string[] includeDirectories)
         {
-            List<Util.FileNode> fileGraph = Util.ParseAllFiles(filePaths, libraryDirectories, includeDirectories);
+            
+            List<FileNode> fileGraph = Util.ParseAllFiles(filePaths, libraryDirectories, includeDirectories);
 
             Dictionary<string, int> includeCounts = new Dictionary<string, int>();
 
             //Include each file once individually for each translation unit.
-            foreach (Util.FileNode rootNode in fileGraph)
+            foreach (FileNode rootNode in fileGraph)
             {
                 //To manage circular dependencies
                 HashSet<string> visitedFiles = new HashSet<string>();
-                Queue<Util.FileNode> frontier = new Queue<Util.FileNode>();
+                Queue<FileNode> frontier = new Queue<FileNode>();
                 frontier.Enqueue(rootNode);
-                visitedFiles.Add(rootNode.fullPath);
+                visitedFiles.Add(rootNode.nodeValue.fullPath);
 
                 while(frontier.Count() > 0)
                 {
-                    Util.FileNode currentNode = frontier.Dequeue();
+                    FileNode currentNode = frontier.Dequeue();
 
-                    string filePath = currentNode.fullPath;
+                    string filePath = currentNode.nodeValue.fullPath;
                     if (!includeCounts.ContainsKey(filePath))
                     {
                         includeCounts.Add(filePath, 0);
                     }
                     includeCounts[filePath] += 1;
 
-                    foreach(Util.FileNode childNode in currentNode.includes)
+                    foreach(FileNode childNode in currentNode.children)
                     {
-                        bool hasNotBeenVisited = visitedFiles.Add(childNode.fullPath);
+                        bool hasNotBeenVisited = visitedFiles.Add(childNode.nodeValue.fullPath);
                         if(hasNotBeenVisited) frontier.Enqueue(childNode);
                     }
                 }

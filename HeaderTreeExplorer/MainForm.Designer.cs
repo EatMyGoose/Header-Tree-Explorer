@@ -153,7 +153,8 @@
             this.cbReportType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cbReportType.FormattingEnabled = true;
             this.cbReportType.Items.AddRange(new object[] {
-            "Include Frequency"});
+            "Include Frequency",
+            "[.dot/.gv] Header Graph"});
             this.cbReportType.Location = new System.Drawing.Point(86, 34);
             this.cbReportType.Name = "cbReportType";
             this.cbReportType.Size = new System.Drawing.Size(226, 32);

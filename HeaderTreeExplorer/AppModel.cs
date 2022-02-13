@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 
+using System.Windows.Forms; //Msgbox
+
 namespace HeaderTreeExplorer
 {
     class AppModel
@@ -73,18 +75,50 @@ namespace HeaderTreeExplorer
                 selectedFiles.ToArray(),
                 libraryDirectories.ToArray(),
                 additionalIncludeDirectories.ToArray()
-                );
+            );
 
             var reportLines = sortedFileFreqList.Select(fInfo => $"{fInfo.IncludeCount, 6}:{fInfo.PathName}");
             var reportText = String.Join("\n", reportLines);
 
-            File.WriteAllText(savePath, reportText);
+            TryWriteTextToFile(reportText, savePath);
+        }
+
+        public void GenerateDotHeaderGraph(string savePath)
+        {
+            List<BaseDotNode> dotFileNodes = GraphVisualizationReport.Generate(
+                selectedFiles.ToArray(),
+                libraryDirectories.ToArray(),
+                additionalIncludeDirectories.ToArray()
+            );
+
+            string reportFileContents = GraphVisualizationReport.GenerateDotFileFromDotNodes(dotFileNodes);
+
+            TryWriteTextToFile(reportFileContents, savePath);
         }
 
         void RefreshFileList()
         {
             viewController.RedrawTreeview(selectedFiles.ToArray());
         }
-   
+
+        //"nothrow" wrapper, prints the builtin exception message if one is encountered.
+        private void TryWriteTextToFile(string fileContents, string path) 
+        {
+            try
+            {
+                File.WriteAllText(path, fileContents);
+            }
+            catch(Exception ex)
+            {
+                //Notify user about failure.
+                MessageBox.Show(
+                    null,
+                    $"Error writing to \"{path}\".\nDetails:\n{ex.ToString()}",
+                    "Error writing to file",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
+        }
     }
 }

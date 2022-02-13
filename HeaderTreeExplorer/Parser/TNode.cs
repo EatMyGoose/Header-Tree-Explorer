@@ -17,6 +17,33 @@ namespace HeaderTreeExplorer.Parser
             if (_children != null) children = _children;
         }
 
+        public static List<TNode<TValue>> GetAllNodes(IEnumerable<TNode<TValue>> startingNodes)
+        {
+            var visited = new HashSet<TNode<TValue>>();
+            var frontier = new Queue<TNode<TValue>>();
+
+            foreach(var startingNode in startingNodes)
+            {
+                if (visited.Contains(startingNode)) continue;
+
+                visited.Add(startingNode);
+                frontier.Enqueue(startingNode);
+
+                while(frontier.Count() > 0)
+                {
+                    var nextNode = frontier.Dequeue();
+
+                    foreach(var childNode in nextNode.children)
+                    {
+                        bool unvisited = visited.Add(childNode);
+                        if (unvisited) frontier.Enqueue(childNode);
+                    }
+                }
+            }
+
+            return visited.ToList();
+        }
+
         //Condenses (links all nodes with only 1 child into a single node) the tree *in-place*
         public static TNode<TValue> CondenseTree(TNode<TValue> root, Func<TValue, TValue, TValue> fnMergeValue)
         {

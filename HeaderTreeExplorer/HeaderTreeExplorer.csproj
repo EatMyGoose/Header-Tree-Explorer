@@ -53,6 +53,7 @@
     </Compile>
     <Compile Include="AppModel.cs" />
     <Compile Include="FreqencyReport.cs" />
+    <Compile Include="GraphVisualizationReport.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>

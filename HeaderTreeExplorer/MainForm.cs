@@ -98,14 +98,43 @@ namespace HeaderTreeExplorer
 
         private void BtnReportGenerate_Click(object sender, EventArgs e)
         {
+            var reportTypeHandlers = new Dictionary<string, Tuple<string,Action<string>>>()
+            {
+                {"Include Frequency",
+                       new Tuple<string,Action<string>>(
+                           "txt File (*.txt)|*.txt",
+                            (string filename) => appModel.GenerateFrequencyReport(filename))
+                },
+                { "[.dot/.gv] Header Graph" ,
+                    new Tuple<string, Action<string>>(
+                        "Dot File (*.gv;*.dot)|*.gv;*.dot",
+                        (string filename) => appModel.GenerateDotHeaderGraph(filename))
+                }
+            };
+
+            string selectedReportName = cbReportType.SelectedItem.ToString();
+            
+            if(!reportTypeHandlers.ContainsKey(selectedReportName))
+            {
+                MessageBox.Show(
+                    $"Error, \"{selectedReportName}\" has not been implemented yet", 
+                    "Report not implemented", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            string saveFilterFormats = reportTypeHandlers[selectedReportName].Item1;
+            Action<string> fnReportGenerator = reportTypeHandlers[selectedReportName].Item2;
+
             using (SaveFileDialog sf = new SaveFileDialog())
             {
                 sf.RestoreDirectory = true;
                 sf.Title = "Select save destination";
-                sf.Filter = "txt File (*.txt)|*.txt";
+                sf.Filter = saveFilterFormats;
                 if(sf.ShowDialog() == DialogResult.OK)
                 {
-                    appModel.GenerateFrequencyReport(sf.FileName);
+                    fnReportGenerator(sf.FileName);
                 }
             }   
         }

@@ -9,8 +9,29 @@ using System.Threading.Tasks;
 
 namespace HeaderTreeExplorer.Parser
 {
+    using FileNode = TNode<CppParserUtility.FileParams>;
+
     static class CppParserUtility
     {
+        public class FileParams : IEquatable<FileParams>
+        {
+            public readonly string fullPath;
+            public readonly bool readSuccessfully;
+
+            public FileParams(string _fullPath, bool _readSuccessfully)
+            {
+                fullPath = _fullPath;
+                readSuccessfully = _readSuccessfully;
+            }
+
+            public bool Equals(FileParams other) //Value comparison
+            {
+                return this.readSuccessfully == other.readSuccessfully &&
+                        this.fullPath == other.fullPath;
+            }
+        }
+        
+
         public enum HeaderType : Byte
         {
             File = 0,   //#include ""
@@ -122,20 +143,6 @@ namespace HeaderTreeExplorer.Parser
             return headers;
         }
 
-        public class FileNode
-        {
-            public readonly string fullPath;
-            public FileNode[] includes;
-            public readonly bool readSuccessfully;
-
-            public FileNode(string _fullPath, FileNode[] _includes, bool _readSuccessfully)
-            {
-                fullPath = _fullPath;
-                includes = _includes;
-                readSuccessfully = _readSuccessfully;
-            }
-        }
-
         static Tuple<Exception, string> TryReadFile(string fullPathName)
         {
             try
@@ -186,7 +193,7 @@ namespace HeaderTreeExplorer.Parser
             foreach (var keyVal in filesAndIncludeNames)
             {
                 bool successfullyParsed = keyVal.Value != null;
-                fileGraph.Add(keyVal.Key, new FileNode(keyVal.Key, null, successfullyParsed));
+                fileGraph.Add(keyVal.Key, new FileNode(new FileParams(keyVal.Key, successfullyParsed), null));
             }
 
             //Then establish parent-child relationships
@@ -195,12 +202,12 @@ namespace HeaderTreeExplorer.Parser
                 //if (!fileGraph.ContainsKey(keyVal.Key)) continue; //Failed to even parse file, skip.
                 FileNode fNode = fileGraph[keyVal.Key];
                 string[] includesPaths = keyVal.Value ?? Array.Empty<string>(); ;
-                FileNode[] includes = includesPaths
+                List<FileNode> includes = includesPaths
                     .Select(path => fileGraph.ContainsKey(path) ? fileGraph[path] : null)
                     .Where(node => node != null)
-                    .ToArray();
+                    .ToList();
 
-                fNode.includes = includes; //assign children.
+                fNode.children = includes.ConvertAll(fInfo => (TNode<FileParams>) fInfo); //assign children.
             }
 
             return fileGraph;
@@ -283,5 +290,73 @@ namespace HeaderTreeExplorer.Parser
                 .ToList();
         }
 
+        public static string PrependNextParentDirToPath(string relPath, string fullPath)
+        {
+            int relPathStartInd = fullPath.IndexOf(relPath);
+
+            if(relPathStartInd < 0) //rel path isn't even part of fullpath
+            {
+                return relPath;
+            }
+
+            if(relPathStartInd == 0)//rel path == fullpath
+            {
+                return relPath;
+            }
+
+            string parentDir = fullPath.Substring(0, relPathStartInd);
+            string directParentDir = Path.GetDirectoryName(parentDir);
+
+            bool dirExists = directParentDir != null && directParentDir != string.Empty;
+
+            if(!dirExists)
+            {
+                return fullPath; //Probably a root path without the drive letter.
+            }
+
+            return Path.Combine(parentDir, relPath); //Add direct parent dir.
+        }
+
+        public static Dictionary<string, string> GetShortestDistinctFilePaths(IEnumerable<string> fullPathNames)
+        {
+            Func<IEnumerable<string>, bool> AllElementsAreUnique = (IEnumerable<string> strSeq) =>
+            {
+                return strSeq.Distinct().Count() == strSeq.Count();
+            };
+
+            IEnumerable<KeyValuePair<string, string>> fullPathToAbbreviationDict =
+                fullPathNames
+                .Select(fullPath => new KeyValuePair<string, string>(fullPath, Path.GetFileName(fullPath)))
+                .GroupBy(t => t.Value)      //Group by common file names & begin to resolve conflicts
+                    .Select(grp => 
+                    {
+                        //key = fullPath
+                        Dictionary<string, string> abbreviatedNamesDict = grp.ToDictionary(kv => kv.Key, kv => kv.Value);
+                        HashSet<string> diffentiatableSet = new HashSet<string>(abbreviatedNamesDict.Keys.ToList());
+
+                        //Progressively add parent directories to the filenames until they are all unique (if possible)
+                        while (!AllElementsAreUnique(diffentiatableSet.Select(fullPath => abbreviatedNamesDict[fullPath])))
+                        {
+                            foreach(string fullPath in diffentiatableSet)
+                            {
+                                string prevAbbr = abbreviatedNamesDict[fullPath]; //i.e. folder1/file.h
+                                string withAdditionalParent = PrependNextParentDirToPath(prevAbbr, fullPath); //i.e. folder2/folder1/file.h
+
+                                if (prevAbbr == withAdditionalParent) //i.e. FullPath not specified or already at root.
+                                {
+                                    //Unable to make path more specific, remove it from the set of paths to be compared for distinctness
+                                    diffentiatableSet.Remove(fullPath);
+                                }
+
+                                abbreviatedNamesDict[fullPath] = withAdditionalParent;
+                            }
+                        }
+
+                        return abbreviatedNamesDict.ToList();
+                    })
+                .SelectMany(kvList => kvList);  //Flatten out keyValue lists
+
+            return fullPathToAbbreviationDict.ToDictionary(kv => kv.Key, kv => kv.Value);
+        }
     }
 }
