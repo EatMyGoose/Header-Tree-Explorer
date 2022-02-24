@@ -6,6 +6,40 @@ using System.Threading.Tasks;
 
 namespace HeaderTreeExplorer.Parser
 {
+    public struct Edge
+    {
+        public readonly int destId;
+        public readonly int srcId;
+
+        public Edge(int _destId = -1, int _srcId = -1)
+        {
+            destId = _destId;
+            srcId = _srcId;
+        }
+    }
+
+    //
+    public class BiNode<TValue>
+    {
+        public int nodeId = -1;
+        public List<Edge> edgeList = new List<Edge>();
+
+        public TValue value = default(TValue);
+
+        public BiNode(int _nodeId)
+        {
+            nodeId = _nodeId;
+        }
+
+        public BiNode(int _nodeId, TValue _value)
+        {
+            nodeId = _nodeId;
+            value = _value;
+        }
+    }
+
+
+    //Specialized class for nodes which only have outward edges
     public class TNode<TValue> where TValue : IEquatable<TValue>
     {
         public TValue nodeValue = default(TValue);

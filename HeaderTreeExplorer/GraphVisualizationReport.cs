@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using System.Drawing;
 using HeaderTreeExplorer.Parser;
 
 namespace HeaderTreeExplorer
@@ -18,11 +19,11 @@ namespace HeaderTreeExplorer
         public abstract string GenerateNodeAttr();
     }
 
-    //TODO: ->  Add "Top Level" Node to represent the selected source files, which are rendered at the top of the dot graph for readibility.
+    //TODO: -> Change to an attribute list bucket, and create a "builder" class for nodes instead
     class BasicDotNode : BaseDotNode
     {
-        string abbreviatedName = "";
-        string fullPathName = "";
+        protected string abbreviatedName = "";
+        protected string fullPathName = "";
 
         public BasicDotNode(string _abbrName, string _fullPathName)
         {
@@ -35,9 +36,134 @@ namespace HeaderTreeExplorer
             return $"[label=\"{abbreviatedName}\" tooltip=\"{fullPathName}\"]";
         }
     }
+
+    class ColouredDotNode : BasicDotNode
+    {
+        Color color = new Color();
+
+        private static string GetColourHexString(Color color)
+        {
+            return $"#{color.R.ToString("x2")}{color.G.ToString("x2")}{color.B.ToString("x2")}{color.A.ToString("x2")}";
+        }
+
+        public ColouredDotNode(string _abbrName, string _fullPathName, Color _color)
+            : base(_abbrName, _fullPathName)
+        {
+            color = _color;
+        }
+
+        public override string GenerateNodeAttr()
+        {
+
+            return $"[label=\"{abbreviatedName}\" tooltip=\"{fullPathName}\" fillcolor=\"{GetColourHexString(color)}\" style=filled]";
+        }
+    }
+
     
     static class GraphVisualizationReport
     {
+
+        public static Color LerpColours(Color c1, Color c2, float fracOfC2)
+        {
+            float fracOfC1 = 1.0f - fracOfC2;
+            Func<byte, byte, byte> LerpByte = (b1, b2) =>
+            {
+                return (byte)(fracOfC1 * b1 + fracOfC2 * b2);
+            };
+
+            return Color.FromArgb(
+                LerpByte(c1.A, c2.A),
+                LerpByte(c1.R, c2.R),
+                LerpByte(c1.G, c2.G),
+                LerpByte(c1.B, c2.B)
+                );
+        }
+
+        // Estimate the impact on compilation by multiplying the times a file is included by the number of includes 
+        // (number of nodes it is directly/indirectly connected to)
+        public static Dictionary<string, int> GetIncludeWeight(List<FileNode> graphNodeSet)
+        {
+
+            //Construct bidirectional graph (nodes with both inbound and outbound edges)
+            List<BiNode<string>> biNodes = graphNodeSet
+                .Select((node, index) =>  new BiNode<string>(index, node.nodeValue.fullPath))
+                .ToList();
+
+            Dictionary<FileNode, int> node2IndexDict = new Dictionary<FileNode, int>();
+            for (int index = 0; index < graphNodeSet.Count(); index++)
+            {
+                node2IndexDict.Add(graphNodeSet[index], index);
+            }
+
+            //Construct edges
+            for (int index = 0; index < graphNodeSet.Count(); index++)
+            {
+                var outwardEdges = graphNodeSet[index].children;
+                BiNode<string> srcNode = biNodes[index];
+                foreach (FileNode fn in outwardEdges)
+                {
+                    int destIndex = node2IndexDict[fn];
+                    BiNode<string> destNode = biNodes[destIndex];
+
+                    //forward edge
+                    srcNode.edgeList.Add(new Edge(destIndex, index));
+                    //add edge on the destination node as well
+                    destNode.edgeList.Add(new Edge(destIndex, index));
+                }
+            }
+
+            bool[] visitedIndices = new bool[biNodes.Count()];  //To avoid repeated memory allocations
+            Func<int, int> countConnectedNodes = (int nodeIndex) =>
+            {
+                Array.Clear(visitedIndices, 0, visitedIndices.Length);
+                visitedIndices[nodeIndex] = true;
+
+                int nConnectedNodes = 0;
+                Queue<int> frontier = new Queue<int>();
+                frontier.Enqueue(nodeIndex);
+                while(frontier.Count() > 0)
+                {
+                    int nextIdx = frontier.Dequeue();
+                    BiNode<string> currentNode = biNodes[nextIdx];
+                    foreach(Edge e in currentNode.edgeList)
+                    {
+                        if(e.srcId == currentNode.nodeId &&
+                           !visitedIndices[e.destId])
+                        {
+                            frontier.Enqueue(e.destId);
+                            visitedIndices[e.destId] = true;
+                            nConnectedNodes += 1;
+                        }
+                    }
+                }
+
+                return nConnectedNodes;
+            };
+
+            //Bi-directional graph complete, now compilation impact by multiplying the no. of inward edges (no. of times the file was included)
+            //by how many other nodes it is indirectly or directly connected to.
+            //(fullPath:string, compilationImpact:int)
+            Dictionary<string, int> compilationImpactDict = new Dictionary<string, int>();
+
+            for(int i = 0; i < biNodes.Count(); i++)
+            {
+                string fullFilename = biNodes[i].value;
+                //Essentially n^2 complexity, no simple way to reduce time complexity since this is a directed graph
+
+                //Number of connected nodes = no. of files that this file has to include, 
+                //add 1 to factor in the cost of the current file as well
+                int nNumberOfIncludes = 1 + countConnectedNodes(i);
+                //Number of inbound edges = no. of times this file is included
+                //TODO: -> instead of just direct includes, count the no. of files that indirectly include it as well?
+                int nTimesIncluded = biNodes[i].edgeList.Count(edge => edge.destId == i) + 1;  
+                int compilationImpact = nNumberOfIncludes * nTimesIncluded;
+                compilationImpactDict[fullFilename] = compilationImpact;
+            }
+
+            return compilationImpactDict;
+        }
+
+        //Returns every node within the graph
         public static List<BaseDotNode> Generate(string[] filePaths, string[] libraryDirectories, string[] includeDirectories)
         {
             List<FileNode> fileGraph = Util.ParseAllFiles(filePaths, libraryDirectories, includeDirectories);
@@ -46,6 +172,9 @@ namespace HeaderTreeExplorer
 
             var fullPathList = nodeList.Select(fNode => fNode.nodeValue.fullPath);
             Dictionary<string,string> fullPathToAbbrDict = Util.GetShortestDistinctFilePaths(fullPathList);
+
+            Dictionary<string, int> includeImpactDict = GetIncludeWeight(nodeList);
+            int maxWeight = includeImpactDict.Max(kv => kv.Value);
 
             //Then proceed to convert it to a BaseDotNode graph 
             //Return all nodes within the graph as a list.
@@ -56,7 +185,15 @@ namespace HeaderTreeExplorer
             List<BaseDotNode> dotNodes = nodeList.Select(fNode => {
                 string fullPath = fNode.nodeValue.fullPath;
                 string abbreviatedPath = fullPathToAbbrDict[fullPath];
-                BaseDotNode convertedNode = new BasicDotNode(abbreviatedPath, fullPath); //Edges not established yet
+
+                float includeWeightFrac = (float)includeImpactDict[fullPath] / (float)maxWeight; // (most minor impact) 0 - 1 (heaviest impact)
+
+                Color minorImpactColour = Color.FromArgb(255, 240, 241, 255); // off-white
+                Color majorImpactColour = Color.FromArgb(255, 255, 107, 107); // dark pink
+
+                Color nodeColor = LerpColours(minorImpactColour, majorImpactColour, includeWeightFrac);
+
+                BaseDotNode convertedNode = new ColouredDotNode(abbreviatedPath, fullPath, nodeColor); //Edges not established yet
                 //Set relationship
                 fNodeToBaseNodeDict.Add(fNode, convertedNode);
                 return convertedNode;
