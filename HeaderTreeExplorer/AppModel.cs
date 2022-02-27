@@ -85,10 +85,19 @@ namespace HeaderTreeExplorer
 
         public void GenerateDotHeaderGraph(string savePath)
         {
+            var includeImpactDict = new Dictionary<MainForm.IncludeImpactCriteria, GraphVisualizationReport.IncludeWeightCriteria>
+            {
+                {MainForm.IncludeImpactCriteria.LOC,  GraphVisualizationReport.IncludeWeightCriteria.NumLOC},
+                {MainForm.IncludeImpactCriteria.numFiles,  GraphVisualizationReport.IncludeWeightCriteria.NumFiles},
+            };
+
+            var includeWeightCriteria = includeImpactDict[viewController.GetIncludeImpactCriteria()];
+
             List<BaseDotNode> dotFileNodes = GraphVisualizationReport.Generate(
                 selectedFiles.ToArray(),
                 libraryDirectories.ToArray(),
-                additionalIncludeDirectories.ToArray()
+                additionalIncludeDirectories.ToArray(),
+                includeWeightCriteria
             );
 
             string reportFileContents = GraphVisualizationReport.GenerateDotFileFromDotNodes(dotFileNodes);

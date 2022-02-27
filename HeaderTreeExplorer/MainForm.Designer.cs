@@ -41,9 +41,13 @@
             this.btnIncludeDirectories = new System.Windows.Forms.Button();
             this.btnLibDirectories = new System.Windows.Forms.Button();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
+            this.gbIncludeImpact = new System.Windows.Forms.GroupBox();
+            this.rbIncludeImpactFiles = new System.Windows.Forms.RadioButton();
+            this.rbIncludeImpactLOC = new System.Windows.Forms.RadioButton();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.groupBox3.SuspendLayout();
+            this.gbIncludeImpact.SuspendLayout();
             this.SuspendLayout();
             // 
             // toolStrip1
@@ -116,6 +120,7 @@
             // 
             this.groupBox2.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.groupBox2.Controls.Add(this.gbIncludeImpact);
             this.groupBox2.Controls.Add(this.BtnReportGenerate);
             this.groupBox2.Controls.Add(this.label2);
             this.groupBox2.Controls.Add(this.cbReportType);
@@ -194,6 +199,39 @@
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "Configure:";
             // 
+            // gbIncludeImpact
+            // 
+            this.gbIncludeImpact.Controls.Add(this.rbIncludeImpactLOC);
+            this.gbIncludeImpact.Controls.Add(this.rbIncludeImpactFiles);
+            this.gbIncludeImpact.Location = new System.Drawing.Point(22, 133);
+            this.gbIncludeImpact.Name = "gbIncludeImpact";
+            this.gbIncludeImpact.Size = new System.Drawing.Size(290, 105);
+            this.gbIncludeImpact.TabIndex = 3;
+            this.gbIncludeImpact.TabStop = false;
+            this.gbIncludeImpact.Text = "Include Impact Criteria";
+            // 
+            // rbIncludeImpactFiles
+            // 
+            this.rbIncludeImpactFiles.AutoSize = true;
+            this.rbIncludeImpactFiles.Location = new System.Drawing.Point(16, 27);
+            this.rbIncludeImpactFiles.Name = "rbIncludeImpactFiles";
+            this.rbIncludeImpactFiles.Size = new System.Drawing.Size(134, 29);
+            this.rbIncludeImpactFiles.TabIndex = 1;
+            this.rbIncludeImpactFiles.Text = "No. of Files";
+            this.rbIncludeImpactFiles.UseVisualStyleBackColor = true;
+            // 
+            // rbIncludeImpactLOC
+            // 
+            this.rbIncludeImpactLOC.AutoSize = true;
+            this.rbIncludeImpactLOC.Checked = true;
+            this.rbIncludeImpactLOC.Location = new System.Drawing.Point(16, 62);
+            this.rbIncludeImpactLOC.Name = "rbIncludeImpactLOC";
+            this.rbIncludeImpactLOC.Size = new System.Drawing.Size(79, 29);
+            this.rbIncludeImpactLOC.TabIndex = 2;
+            this.rbIncludeImpactLOC.TabStop = true;
+            this.rbIncludeImpactLOC.Text = "LOC";
+            this.rbIncludeImpactLOC.UseVisualStyleBackColor = true;
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(11F, 24F);
@@ -211,6 +249,8 @@
             this.groupBox2.ResumeLayout(false);
             this.groupBox2.PerformLayout();
             this.groupBox3.ResumeLayout(false);
+            this.gbIncludeImpact.ResumeLayout(false);
+            this.gbIncludeImpact.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -231,6 +271,9 @@
         private System.Windows.Forms.Button btnIncludeDirectories;
         private System.Windows.Forms.Button btnLibDirectories;
         private System.Windows.Forms.GroupBox groupBox3;
+        private System.Windows.Forms.GroupBox gbIncludeImpact;
+        private System.Windows.Forms.RadioButton rbIncludeImpactLOC;
+        private System.Windows.Forms.RadioButton rbIncludeImpactFiles;
     }
 }
 

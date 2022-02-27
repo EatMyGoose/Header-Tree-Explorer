@@ -15,7 +15,16 @@ namespace HeaderTreeExplorer
 {
     public partial class MainForm : Form
     {
+        const string CB_OPT_FREQ = "Include Frequency";
+        const string CB_OPT_HEADER_GRAPH = "[.dot/.gv] Header Graph";
+
         AppModel appModel;
+
+        public enum IncludeImpactCriteria
+        {
+            numFiles,
+            LOC,
+        }
 
         public MainForm()
         {
@@ -23,9 +32,30 @@ namespace HeaderTreeExplorer
 
             appModel = new AppModel(this);
 
+            cbReportType.SelectedIndexChanged += (object sender, EventArgs e) => UpdateIncludeImpactGroupboxVisibility(); 
             cbReportType.SelectedIndex = 0; //Frequency Report
-
+            
             RedrawTreeview(Array.Empty<string>());
+        }
+
+        void UpdateIncludeImpactGroupboxVisibility()
+        {
+            bool selectedHeaderGraph = cbReportType.SelectedItem.ToString() == CB_OPT_HEADER_GRAPH;
+            gbIncludeImpact.Enabled = selectedHeaderGraph;
+        }
+
+        public IncludeImpactCriteria GetIncludeImpactCriteria()
+        {
+            if(rbIncludeImpactFiles.Checked == true)
+            {
+                return IncludeImpactCriteria.numFiles;
+            }
+            else if(rbIncludeImpactLOC.Checked == true)
+            {
+                return IncludeImpactCriteria.LOC;
+            }
+
+            throw new NotImplementedException("Error, unknown include impact criteria selected within UI");
         }
 
         public void RedrawTreeview(string[] newPaths)
@@ -100,12 +130,12 @@ namespace HeaderTreeExplorer
         {
             var reportTypeHandlers = new Dictionary<string, Tuple<string,Action<string>>>()
             {
-                {"Include Frequency",
+                {CB_OPT_FREQ,
                        new Tuple<string,Action<string>>(
                            "txt File (*.txt)|*.txt",
                             (string filename) => appModel.GenerateFrequencyReport(filename))
                 },
-                { "[.dot/.gv] Header Graph" ,
+                {CB_OPT_HEADER_GRAPH,
                     new Tuple<string, Action<string>>(
                         "Dot File (*.gv;*.dot)|*.gv;*.dot",
                         (string filename) => appModel.GenerateDotHeaderGraph(filename))

@@ -15,8 +15,29 @@ namespace HeaderTreeExplorer
     //TODO: Generalize directed graph class to minimize back & front conversions.
     abstract class BaseDotNode
     {
+        Dictionary<string, string> attributes = new Dictionary<string, string>();
+
         public BaseDotNode[] outboundEdges = new BaseDotNode[]{};
-        public abstract string GenerateNodeAttr();
+
+        public string GenerateNodeAttr()
+        {
+            //space separated pairs of `key="value"`
+            return $"[{String.Join(" ", attributes.Select(kv => kv.Key + '=' + '"' + kv.Value + '"'))}]";
+        }
+
+        protected bool AddAttribute(string key, string value)
+        {
+            if(!attributes.ContainsKey(key))
+            {
+                attributes.Add(key, value);
+                return true;
+            }
+            else
+            {
+                Console.Error.WriteLine($"Error, inserting<{key},{value}> - key<{key}> already exists with value {attributes[key]}");
+                return false;
+            }
+        }
     }
 
     //TODO: -> Change to an attribute list bucket, and create a "builder" class for nodes instead
@@ -29,11 +50,9 @@ namespace HeaderTreeExplorer
         {
             abbreviatedName = _abbrName;
             fullPathName = _fullPathName;
-        }
 
-        public override string GenerateNodeAttr()
-        {
-            return $"[label=\"{abbreviatedName}\" tooltip=\"{fullPathName}\"]";
+            AddAttribute("label", abbreviatedName);
+            AddAttribute("tooltip", fullPathName);
         }
     }
 
@@ -50,12 +69,8 @@ namespace HeaderTreeExplorer
             : base(_abbrName, _fullPathName)
         {
             color = _color;
-        }
-
-        public override string GenerateNodeAttr()
-        {
-
-            return $"[label=\"{abbreviatedName}\" tooltip=\"{fullPathName}\" fillcolor=\"{GetColourHexString(color)}\" style=filled]";
+            AddAttribute("style", "filled");
+            AddAttribute("fillcolor", GetColourHexString(color));
         }
     }
 
@@ -63,7 +78,32 @@ namespace HeaderTreeExplorer
     static class GraphVisualizationReport
     {
 
-        public static Color LerpColours(Color c1, Color c2, float fracOfC2)
+        public struct IncludeWeightParams
+        {
+            public readonly int directIncludeCount;  //number of files that include this particular file
+            public readonly int totalFilesIncluded;  //number of files that this file directly/indirectly includes
+
+            public readonly int totalLOCsIncluded;   //Total LOCs in the include tree of this file
+
+            public IncludeWeightParams(int _directIncludeCount, int _totalFilesIncluded, int _totalLOCsIncluded)
+            {
+                directIncludeCount = _directIncludeCount;
+                totalFilesIncluded = _totalFilesIncluded;
+                totalLOCsIncluded = _totalLOCsIncluded;
+            }
+
+            public int GetFileBasedIncludeWeight()
+            {
+                return (1 + directIncludeCount) * (1 + totalFilesIncluded);
+            }
+
+            public int GetLOCBasedIncludeWeight()
+            {
+                return (1 + directIncludeCount) * (totalLOCsIncluded);
+            }
+        }
+
+        static Color LerpColours(Color c1, Color c2, float fracOfC2)
         {
             float fracOfC1 = 1.0f - fracOfC2;
             Func<byte, byte, byte> LerpByte = (b1, b2) =>
@@ -81,12 +121,12 @@ namespace HeaderTreeExplorer
 
         // Estimate the impact on compilation by multiplying the times a file is included by the number of includes 
         // (number of nodes it is directly/indirectly connected to)
-        public static Dictionary<string, int> GetIncludeWeight(List<FileNode> graphNodeSet)
+        static Dictionary<string, IncludeWeightParams> GetIncludeWeight(List<FileNode> graphNodeSet)
         {
 
             //Construct bidirectional graph (nodes with both inbound and outbound edges)
-            List<BiNode<string>> biNodes = graphNodeSet
-                .Select((node, index) =>  new BiNode<string>(index, node.nodeValue.fullPath))
+            List<BiNode<CppParserUtility.FileParams>> biNodes = graphNodeSet
+                .Select((node, index) =>  new BiNode<CppParserUtility.FileParams>(index, node.nodeValue))
                 .ToList();
 
             Dictionary<FileNode, int> node2IndexDict = new Dictionary<FileNode, int>();
@@ -99,11 +139,11 @@ namespace HeaderTreeExplorer
             for (int index = 0; index < graphNodeSet.Count(); index++)
             {
                 var outwardEdges = graphNodeSet[index].children;
-                BiNode<string> srcNode = biNodes[index];
+                var srcNode = biNodes[index];
                 foreach (FileNode fn in outwardEdges)
                 {
                     int destIndex = node2IndexDict[fn];
-                    BiNode<string> destNode = biNodes[destIndex];
+                    var destNode = biNodes[destIndex];
 
                     //forward edge
                     srcNode.edgeList.Add(new Edge(destIndex, index));
@@ -113,58 +153,69 @@ namespace HeaderTreeExplorer
             }
 
             bool[] visitedIndices = new bool[biNodes.Count()];  //To avoid repeated memory allocations
-            Func<int, int> countConnectedNodes = (int nodeIndex) =>
+            //(nodeIdx:int) => (nConnectedNodes:int, nLOCs:int)
+            Func<int, Tuple<int,int>> countConnectedNodes = (int nodeIndex) =>
             {
                 Array.Clear(visitedIndices, 0, visitedIndices.Length);
                 visitedIndices[nodeIndex] = true;
 
                 int nConnectedNodes = 0;
+                int nTotalLOCs = biNodes[nodeIndex].value.nLOCs;
                 Queue<int> frontier = new Queue<int>();
                 frontier.Enqueue(nodeIndex);
+
                 while(frontier.Count() > 0)
                 {
                     int nextIdx = frontier.Dequeue();
-                    BiNode<string> currentNode = biNodes[nextIdx];
+                    var currentNode = biNodes[nextIdx];
                     foreach(Edge e in currentNode.edgeList)
                     {
-                        if(e.srcId == currentNode.nodeId &&
-                           !visitedIndices[e.destId])
+                        int destNodeIdx = e.destId;
+                        if (e.srcId == currentNode.nodeId &&
+                           !visitedIndices[destNodeIdx])
                         {
-                            frontier.Enqueue(e.destId);
-                            visitedIndices[e.destId] = true;
+                            frontier.Enqueue(destNodeIdx);
+                            visitedIndices[destNodeIdx] = true;
                             nConnectedNodes += 1;
+                            nTotalLOCs += biNodes[destNodeIdx].value.nLOCs;
                         }
                     }
                 }
 
-                return nConnectedNodes;
+                return Tuple.Create(nConnectedNodes, nTotalLOCs);
             };
 
             //Bi-directional graph complete, now compilation impact by multiplying the no. of inward edges (no. of times the file was included)
             //by how many other nodes it is indirectly or directly connected to.
             //(fullPath:string, compilationImpact:int)
-            Dictionary<string, int> compilationImpactDict = new Dictionary<string, int>();
+            var compilationImpactDict = new Dictionary<string, IncludeWeightParams>();
 
             for(int i = 0; i < biNodes.Count(); i++)
             {
-                string fullFilename = biNodes[i].value;
+                string fullFilename = biNodes[i].value.fullPath;
                 //Essentially n^2 complexity, no simple way to reduce time complexity since this is a directed graph
 
-                //Number of connected nodes = no. of files that this file has to include, 
-                //add 1 to factor in the cost of the current file as well
-                int nNumberOfIncludes = 1 + countConnectedNodes(i);
+                Tuple<int, int> nIncludesAndLOCs = countConnectedNodes(i);
+                int nFilesIncluded = nIncludesAndLOCs.Item1;
+                int nLOCsIncluded = nIncludesAndLOCs.Item2;
+                
                 //Number of inbound edges = no. of times this file is included
                 //TODO: -> instead of just direct includes, count the no. of files that indirectly include it as well?
                 int nTimesIncluded = biNodes[i].edgeList.Count(edge => edge.destId == i) + 1;  
-                int compilationImpact = nNumberOfIncludes * nTimesIncluded;
-                compilationImpactDict[fullFilename] = compilationImpact;
+                compilationImpactDict[fullFilename] = new IncludeWeightParams(nTimesIncluded, nFilesIncluded, nLOCsIncluded);
             }
 
             return compilationImpactDict;
         }
 
+        public enum IncludeWeightCriteria
+        {
+            NumLOC, //Count using no. of lines of code included
+            NumFiles //Count using no. of files included
+        }
+
         //Returns every node within the graph
-        public static List<BaseDotNode> Generate(string[] filePaths, string[] libraryDirectories, string[] includeDirectories)
+        public static List<BaseDotNode> Generate(string[] filePaths, string[] libraryDirectories, string[] includeDirectories, IncludeWeightCriteria weightCriteria)
         {
             List<FileNode> fileGraph = Util.ParseAllFiles(filePaths, libraryDirectories, includeDirectories);
             //bfs graph to get all filenames, then obtain their abbreviations
@@ -173,8 +224,21 @@ namespace HeaderTreeExplorer
             var fullPathList = nodeList.Select(fNode => fNode.nodeValue.fullPath);
             Dictionary<string,string> fullPathToAbbrDict = Util.GetShortestDistinctFilePaths(fullPathList);
 
-            Dictionary<string, int> includeImpactDict = GetIncludeWeight(nodeList);
-            int maxWeight = includeImpactDict.Max(kv => kv.Value);
+            Func<IncludeWeightParams, int> GetWeight = (IncludeWeightParams weightInfo) => 
+            {
+                switch (weightCriteria)
+                {
+                    case IncludeWeightCriteria.NumFiles:
+                        return weightInfo.GetFileBasedIncludeWeight();
+                    case IncludeWeightCriteria.NumLOC:
+                        return weightInfo.GetLOCBasedIncludeWeight();
+                    default:
+                        throw new NotImplementedException("Error, unhandled include weight criteria");
+                }
+            };
+
+            Dictionary<string, IncludeWeightParams> includeImpactDict = GetIncludeWeight(nodeList);
+            int maxWeight = includeImpactDict.Max(kv => GetWeight(kv.Value));
 
             //Then proceed to convert it to a BaseDotNode graph 
             //Return all nodes within the graph as a list.
@@ -185,15 +249,24 @@ namespace HeaderTreeExplorer
             List<BaseDotNode> dotNodes = nodeList.Select(fNode => {
                 string fullPath = fNode.nodeValue.fullPath;
                 string abbreviatedPath = fullPathToAbbrDict[fullPath];
+                int nLOCs = fNode.nodeValue.nLOCs;
+                IncludeWeightParams includeWeightParams = includeImpactDict[fullPath];
 
-                float includeWeightFrac = (float)includeImpactDict[fullPath] / (float)maxWeight; // (most minor impact) 0 - 1 (heaviest impact)
+                string tooltip = string.Join("\n",
+                        $"Full Path:{fullPathToAbbrDict[fullPath]}",
+                        $"Total no. of Files Included:{includeWeightParams.totalFilesIncluded}",
+                        $"LOCs(self):{nLOCs}",
+                        $"LOCs(total included):{includeWeightParams.totalLOCsIncluded}"
+                        );
+
+                float includeWeightFrac = (float)GetWeight(includeWeightParams) / (float)maxWeight; // (most minor impact) 0 - 1 (heaviest impact)
 
                 Color minorImpactColour = Color.FromArgb(255, 240, 241, 255); // off-white
                 Color majorImpactColour = Color.FromArgb(255, 255, 107, 107); // dark pink
 
                 Color nodeColor = LerpColours(minorImpactColour, majorImpactColour, includeWeightFrac);
 
-                BaseDotNode convertedNode = new ColouredDotNode(abbreviatedPath, fullPath, nodeColor); //Edges not established yet
+                BaseDotNode convertedNode = new ColouredDotNode(abbreviatedPath, tooltip, nodeColor); //Edges not established yet
                 //Set relationship
                 fNodeToBaseNodeDict.Add(fNode, convertedNode);
                 return convertedNode;

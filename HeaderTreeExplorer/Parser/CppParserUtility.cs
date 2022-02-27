@@ -16,18 +16,21 @@ namespace HeaderTreeExplorer.Parser
         public class FileParams : IEquatable<FileParams>
         {
             public readonly string fullPath;
+            public readonly int nLOCs;
             public readonly bool readSuccessfully;
 
-            public FileParams(string _fullPath, bool _readSuccessfully)
+            public FileParams(string _fullPath, bool _readSuccessfully, int _nLOCs)
             {
                 fullPath = _fullPath;
                 readSuccessfully = _readSuccessfully;
+                nLOCs = _nLOCs;
             }
 
             public bool Equals(FileParams other) //Value comparison
             {
                 return this.readSuccessfully == other.readSuccessfully &&
-                        this.fullPath == other.fullPath;
+                       this.fullPath == other.fullPath &&
+                       this.nLOCs == other.nLOCs;
             }
         }
         
@@ -80,8 +83,8 @@ namespace HeaderTreeExplorer.Parser
                             break;
                         case ParseStatus.None:
                             //Find "//" or "/*"
-                            int nextSingleLineComment = line.IndexOf(@"\\", currentCharIndex);
-                            int nextMultiLineComment = line.IndexOf(@"\*", currentCharIndex);
+                            int nextSingleLineComment = line.IndexOf(@"//", currentCharIndex);
+                            int nextMultiLineComment = line.IndexOf(@"/*", currentCharIndex);
 
                             bool possibleSingleLineComment = nextSingleLineComment >= 0;
                             bool possibleMultiLineComment = nextMultiLineComment >= 0;
@@ -127,13 +130,11 @@ namespace HeaderTreeExplorer.Parser
 
         //Performs comment removal before extraction.
         //List<(type:[Library|File], filename:string)>
-        public static List<Tuple<HeaderType, string>> GetCppHeaders(string cppSource)
+        public static List<Tuple<HeaderType, string>> GetCppHeaders(string cppSourceWithoutComments)
         {
-            string strippedOfComments = StripComments(cppSource);
-
             var headers = new List<Tuple<HeaderType, string>>();
 
-            foreach (Match match in headerRegex.Matches(strippedOfComments))
+            foreach (Match match in headerRegex.Matches(cppSourceWithoutComments))
             {
                 HeaderType type = (match.Groups[1].Value == "<") ? HeaderType.Library : HeaderType.File;
                 string fileName = match.Groups[2].Value;
@@ -141,6 +142,14 @@ namespace HeaderTreeExplorer.Parser
             }
 
             return headers;
+        }
+
+        static char[] newlineSeparator = new char[] { '\n' }; 
+        public static int CountNonEmptyLOCs(string cppSourceWithoutComments)
+        {
+            return cppSourceWithoutComments
+                .Split(newlineSeparator, StringSplitOptions.RemoveEmptyEntries)
+                .Count(line => line.Trim().Length > 0); //AKA non-empty lines
         }
 
         static Tuple<Exception, string> TryReadFile(string fullPathName)
@@ -159,6 +168,13 @@ namespace HeaderTreeExplorer.Parser
         //Null if none could be found
         static string FindFullPathForFile(string path, string currentDir, string[] directories)
         {
+            //Sanity check, since IsPathRooted throws if invalid path chars are detected
+            if(path.IndexOfAny(Path.GetInvalidPathChars()) >= 0)
+            {
+                Console.Error.WriteLine($"Error, path<{path}> in directory<{currentDir}> has invalid path characters");
+                return null;
+            }
+
             //Already a full path
             if(Path.IsPathRooted(path))
             {
@@ -186,14 +202,16 @@ namespace HeaderTreeExplorer.Parser
         }
 
         //filesAndIncludeNames - specify files that could not be loaded by setting the dict value to null
-        static Dictionary<string, FileNode> BuildFileNodeGraph(Dictionary<string, string[]> filesAndIncludeNames)
+        static Dictionary<string, FileNode> BuildFileNodeGraph(Dictionary<string, string[]> filesAndIncludeNames, Dictionary<string, int> nLOCsPerFile)
         {
             var fileGraph = new Dictionary<string, FileNode>();
             //Construct nodes first
             foreach (var keyVal in filesAndIncludeNames)
             {
                 bool successfullyParsed = keyVal.Value != null;
-                fileGraph.Add(keyVal.Key, new FileNode(new FileParams(keyVal.Key, successfullyParsed), null));
+                string fileName = keyVal.Key; //Depending on whether the file could be opened, may or may not be a full pathname
+                int nLOCs = nLOCsPerFile[fileName];
+                fileGraph.Add(keyVal.Key, new FileNode(new FileParams(fileName, successfullyParsed, nLOCs), null));
             }
 
             //Then establish parent-child relationships
@@ -216,12 +234,12 @@ namespace HeaderTreeExplorer.Parser
         //Requires full paths for all paths
         public static List<FileNode> ParseAllFiles(string[] fullFileNames, string[] libraryDirectories, string[] includeDirectories)
         {
-            //dict<string:fullPath, fullPathOfIncludedFiles:string[]>
-            var parsedFiles = new Dictionary<string, string[]>(); //For files which could not be parsed, the include list will be null.
+            //dict<string:fullPath, (fullPathOfIncludedFiles:string[], nLOCs:int)>
+            var parsedFiles = new Dictionary<string, Tuple<string[], int>>(); //For files which could not be parsed, the include list will be null.
 
+            /*Currently unused, keeps a record of files that couldn't be opened for one reason or another*/
             //dict<string:fullPath, info:Exception> : Error history for files which could not be opened
             var errorHistory = new Dictionary<string, Exception>();
-
             //dict<fullPath:string, list of includes that couldn't be found: string[]>
             var includeErrorHistory = new Dictionary<string, string[]>();
 
@@ -243,11 +261,15 @@ namespace HeaderTreeExplorer.Parser
                     if(readException != null) //Failed to open file
                     {
                         errorHistory.Add(currentFile, readException);
-                        parsedFiles.Add(currentFile, null);
+                        parsedFiles.Add(currentFile, Tuple.Create<string[], int>(null, 0));
                         continue;
                     }
 
-                    List<Tuple<HeaderType, string>> headerList = GetCppHeaders(fileText);
+                    //TODO: unify assignment of parsedFiles/locsInFiles instead of having them in multiple places
+                    string strippedOfComments = StripComments(fileText);
+                    int nNonEmptyLOCs = CountNonEmptyLOCs(strippedOfComments);
+
+                    List<Tuple<HeaderType, string>> headerList = GetCppHeaders(strippedOfComments);
                     var headerPaths = headerList.Select(t =>
                     {
                         string[] additionalSearchDir = (t.Item1 == HeaderType.File) ? includeDirectories : libraryDirectories;
@@ -261,7 +283,7 @@ namespace HeaderTreeExplorer.Parser
                         string fullPath = t.Item2;
                         return fullPath ?? relPath; 
                     }).ToArray();
-                    parsedFiles.Add(currentFile, includedFiles);
+                    parsedFiles.Add(currentFile, Tuple.Create(includedFiles, nNonEmptyLOCs));
 
                     string[] unfindableIncludes = headerPaths.Where(t => t.Item2 == null).Select(t => t.Item1).ToArray();
                     if(unfindableIncludes.Length > 0)
@@ -270,11 +292,11 @@ namespace HeaderTreeExplorer.Parser
                         foreach(string relPath in unfindableIncludes)
                         {
                             //Mark them as parsed, but with null includes to signify read error
-                            if (!parsedFiles.ContainsKey(relPath)) parsedFiles.Add(relPath, null);
+                            if (!parsedFiles.ContainsKey(relPath)) parsedFiles.Add(relPath, Tuple.Create<string[], int>(null, 0));
                         }
                     }
 
-                    //Only push header files that whose full path can be found on disk
+                    //Only search for header files that whose full path can be found on disk
                     var foundHeaderFiles = headerPaths.Where(t => t.Item2 != null).Select(t => t.Item2);
                     foreach(string fullIncludePath in foundHeaderFiles)
                     {
@@ -283,7 +305,10 @@ namespace HeaderTreeExplorer.Parser
                 }
             }
 
-            Dictionary<string, FileNode> fileGraph = BuildFileNodeGraph(parsedFiles);
+            Dictionary<string, string[]> fileAndIncludeNames = parsedFiles.ToDictionary(kv => kv.Key, kv => kv.Value.Item1);
+            Dictionary<string, int> fileLOCDict = parsedFiles.ToDictionary(kv => kv.Key, kv => kv.Value.Item2);
+
+            Dictionary<string, FileNode> fileGraph = BuildFileNodeGraph(fileAndIncludeNames, fileLOCDict);
            
             return fullFileNames
                 .Select(fullPath => fileGraph.ContainsKey(fullPath)? fileGraph[fullPath] : null)
