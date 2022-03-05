@@ -83,6 +83,19 @@ namespace HeaderTreeExplorer
             TryWriteTextToFile(reportText, savePath);
         }
 
+        public void IncludeAllHeadersWithinVSProject(string filePath)
+        {
+            Parser.VcxprojInfo projInfo = Parser.VcxprojParser.ParseProjectFile(filePath);
+            if(projInfo == null) return; //error
+
+            //Add all header files specified in the project
+            string[] fullHeaderPaths = projInfo.headerFileNames
+                .Select(relPath => Path.Combine(projInfo.projFileDir, relPath))
+                .ToArray();
+
+            AddFiles(fullHeaderPaths);
+        }
+
         public void GenerateDotHeaderGraph(string savePath)
         {
             var includeImpactDict = new Dictionary<MainForm.IncludeImpactCriteria, GraphVisualizationReport.IncludeWeightCriteria>

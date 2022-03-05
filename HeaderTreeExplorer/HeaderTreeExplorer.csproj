@@ -63,6 +63,7 @@
     <Compile Include="MainClass.cs" />
     <Compile Include="Parser\CppParserUtility.cs" />
     <Compile Include="Parser\TNode.cs" />
+    <Compile Include="Parser\VcxprojParser.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="AdditionalIncludeForm.resx">
       <DependentUpon>AdditionalIncludeForm.cs</DependentUpon>

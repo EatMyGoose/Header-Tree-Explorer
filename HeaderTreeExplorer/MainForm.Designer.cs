@@ -35,19 +35,20 @@
             this.label1 = new System.Windows.Forms.Label();
             this.tvSelectedFiles = new System.Windows.Forms.TreeView();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.gbIncludeImpact = new System.Windows.Forms.GroupBox();
+            this.rbIncludeImpactLOC = new System.Windows.Forms.RadioButton();
+            this.rbIncludeImpactFiles = new System.Windows.Forms.RadioButton();
             this.BtnReportGenerate = new System.Windows.Forms.Button();
             this.label2 = new System.Windows.Forms.Label();
             this.cbReportType = new System.Windows.Forms.ComboBox();
             this.btnIncludeDirectories = new System.Windows.Forms.Button();
             this.btnLibDirectories = new System.Windows.Forms.Button();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
-            this.gbIncludeImpact = new System.Windows.Forms.GroupBox();
-            this.rbIncludeImpactFiles = new System.Windows.Forms.RadioButton();
-            this.rbIncludeImpactLOC = new System.Windows.Forms.RadioButton();
+            this.btnImportVSProject = new System.Windows.Forms.Button();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
-            this.groupBox3.SuspendLayout();
             this.gbIncludeImpact.SuspendLayout();
+            this.groupBox3.SuspendLayout();
             this.SuspendLayout();
             // 
             // toolStrip1
@@ -64,6 +65,7 @@
             this.groupBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.groupBox1.Controls.Add(this.btnImportVSProject);
             this.groupBox1.Controls.Add(this.BtnDeleteAll);
             this.groupBox1.Controls.Add(this.BtnLoadFile);
             this.groupBox1.Controls.Add(this.label1);
@@ -130,6 +132,39 @@
             this.groupBox2.TabIndex = 3;
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "Report Generator";
+            // 
+            // gbIncludeImpact
+            // 
+            this.gbIncludeImpact.Controls.Add(this.rbIncludeImpactLOC);
+            this.gbIncludeImpact.Controls.Add(this.rbIncludeImpactFiles);
+            this.gbIncludeImpact.Location = new System.Drawing.Point(22, 133);
+            this.gbIncludeImpact.Name = "gbIncludeImpact";
+            this.gbIncludeImpact.Size = new System.Drawing.Size(290, 105);
+            this.gbIncludeImpact.TabIndex = 3;
+            this.gbIncludeImpact.TabStop = false;
+            this.gbIncludeImpact.Text = "Include Impact Criteria";
+            // 
+            // rbIncludeImpactLOC
+            // 
+            this.rbIncludeImpactLOC.AutoSize = true;
+            this.rbIncludeImpactLOC.Checked = true;
+            this.rbIncludeImpactLOC.Location = new System.Drawing.Point(16, 62);
+            this.rbIncludeImpactLOC.Name = "rbIncludeImpactLOC";
+            this.rbIncludeImpactLOC.Size = new System.Drawing.Size(79, 29);
+            this.rbIncludeImpactLOC.TabIndex = 2;
+            this.rbIncludeImpactLOC.TabStop = true;
+            this.rbIncludeImpactLOC.Text = "LOC";
+            this.rbIncludeImpactLOC.UseVisualStyleBackColor = true;
+            // 
+            // rbIncludeImpactFiles
+            // 
+            this.rbIncludeImpactFiles.AutoSize = true;
+            this.rbIncludeImpactFiles.Location = new System.Drawing.Point(16, 27);
+            this.rbIncludeImpactFiles.Name = "rbIncludeImpactFiles";
+            this.rbIncludeImpactFiles.Size = new System.Drawing.Size(134, 29);
+            this.rbIncludeImpactFiles.TabIndex = 1;
+            this.rbIncludeImpactFiles.Text = "No. of Files";
+            this.rbIncludeImpactFiles.UseVisualStyleBackColor = true;
             // 
             // BtnReportGenerate
             // 
@@ -199,38 +234,15 @@
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "Configure:";
             // 
-            // gbIncludeImpact
+            // btnImportVSProject
             // 
-            this.gbIncludeImpact.Controls.Add(this.rbIncludeImpactLOC);
-            this.gbIncludeImpact.Controls.Add(this.rbIncludeImpactFiles);
-            this.gbIncludeImpact.Location = new System.Drawing.Point(22, 133);
-            this.gbIncludeImpact.Name = "gbIncludeImpact";
-            this.gbIncludeImpact.Size = new System.Drawing.Size(290, 105);
-            this.gbIncludeImpact.TabIndex = 3;
-            this.gbIncludeImpact.TabStop = false;
-            this.gbIncludeImpact.Text = "Include Impact Criteria";
-            // 
-            // rbIncludeImpactFiles
-            // 
-            this.rbIncludeImpactFiles.AutoSize = true;
-            this.rbIncludeImpactFiles.Location = new System.Drawing.Point(16, 27);
-            this.rbIncludeImpactFiles.Name = "rbIncludeImpactFiles";
-            this.rbIncludeImpactFiles.Size = new System.Drawing.Size(134, 29);
-            this.rbIncludeImpactFiles.TabIndex = 1;
-            this.rbIncludeImpactFiles.Text = "No. of Files";
-            this.rbIncludeImpactFiles.UseVisualStyleBackColor = true;
-            // 
-            // rbIncludeImpactLOC
-            // 
-            this.rbIncludeImpactLOC.AutoSize = true;
-            this.rbIncludeImpactLOC.Checked = true;
-            this.rbIncludeImpactLOC.Location = new System.Drawing.Point(16, 62);
-            this.rbIncludeImpactLOC.Name = "rbIncludeImpactLOC";
-            this.rbIncludeImpactLOC.Size = new System.Drawing.Size(79, 29);
-            this.rbIncludeImpactLOC.TabIndex = 2;
-            this.rbIncludeImpactLOC.TabStop = true;
-            this.rbIncludeImpactLOC.Text = "LOC";
-            this.rbIncludeImpactLOC.UseVisualStyleBackColor = true;
+            this.btnImportVSProject.Location = new System.Drawing.Point(383, 32);
+            this.btnImportVSProject.Name = "btnImportVSProject";
+            this.btnImportVSProject.Size = new System.Drawing.Size(172, 34);
+            this.btnImportVSProject.TabIndex = 4;
+            this.btnImportVSProject.Text = "Load .vcxproj";
+            this.btnImportVSProject.UseVisualStyleBackColor = true;
+            this.btnImportVSProject.Click += new System.EventHandler(this.btnImportVSProject_Click);
             // 
             // MainForm
             // 
@@ -248,9 +260,9 @@
             this.groupBox1.PerformLayout();
             this.groupBox2.ResumeLayout(false);
             this.groupBox2.PerformLayout();
-            this.groupBox3.ResumeLayout(false);
             this.gbIncludeImpact.ResumeLayout(false);
             this.gbIncludeImpact.PerformLayout();
+            this.groupBox3.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -274,6 +286,7 @@
         private System.Windows.Forms.GroupBox gbIncludeImpact;
         private System.Windows.Forms.RadioButton rbIncludeImpactLOC;
         private System.Windows.Forms.RadioButton rbIncludeImpactFiles;
+        private System.Windows.Forms.Button btnImportVSProject;
     }
 }
 

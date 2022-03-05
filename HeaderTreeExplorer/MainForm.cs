@@ -198,5 +198,18 @@ namespace HeaderTreeExplorer
 
             additionalIncludeForm.ShowDialog();
         }
+
+        private void btnImportVSProject_Click(object sender, EventArgs e)
+        {
+            using (var of = new OpenFileDialog())
+            {
+                of.Filter = "VS Project Files (vcxproj)|*.vcxproj";
+                of.Title = "Select VS C++ Project";
+                if(of.ShowDialog() == DialogResult.OK)
+                {
+                    appModel.IncludeAllHeadersWithinVSProject(of.FileName);
+                }
+            }
+        }
     }
 }
