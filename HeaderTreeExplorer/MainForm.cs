@@ -98,17 +98,51 @@ namespace HeaderTreeExplorer
 
         private void BtnLoadFile_Click(object sender, EventArgs e)
         {
-            using (OpenFileDialog of = new OpenFileDialog())
+            FileAndFolderBrowserDialog loadFilesAndFoldersDialog = new FileAndFolderBrowserDialog();
+            loadFilesAndFoldersDialog.fileFilters = string.Join("|", new string[] {
+                "C++ header files(*.h, *.hpp)|*.h;*.hpp",
+                "C++ header and impl files(*.cpp, *.h, *.hpp)|*.cpp;*.h;*.hpp",
+                "All Files(*.*)|*.*",
+            });
+
+            loadFilesAndFoldersDialog.selectableFiles = true;
+            loadFilesAndFoldersDialog.selectableFolders = true;
+            loadFilesAndFoldersDialog.multiSelect = true;
+
+            if (loadFilesAndFoldersDialog.ShowDialog() == DialogResult.OK)
             {
-                of.RestoreDirectory = true;
-                of.Title = "Select Source Files";
-                of.Filter = "C++ Source Files (*.h;*.cpp;*.hpp;*.cxx)|*.h;*.cpp;*.hpp;*.cxx|All files (*.*)|*.*";
-                of.Multiselect = true;
-                of.CheckPathExists = true;
-                if(of.ShowDialog() == DialogResult.OK)
+                string[] filenames = loadFilesAndFoldersDialog.GetSelectedFiles();
+                Stack<string> selectedFolders = new Stack<string>(loadFilesAndFoldersDialog.GetSelectedFolders());
+                List<string> filesInSubFolderSelection = new List<string>();
+                Func<string, bool> selectedFileFilter = loadFilesAndFoldersDialog.GetCurrentlySelectedExtensionFilter();
+                while (selectedFolders.Count() > 0)
                 {
-                    appModel.AddFiles(of.FileNames);
+                    string currentFolder = selectedFolders.Pop();
+
+                    string[] filesInCurrentFolder = new string[] { };
+                    string[] foldersInCurrentFolder = new string[] { };
+                    try
+                    {
+                        filesInCurrentFolder = Directory.GetFiles(currentFolder);
+                        foldersInCurrentFolder = Directory.GetDirectories(currentFolder);
+                    }
+                    catch
+                    {
+                        //Ignore.
+                    }
+
+                    filesInSubFolderSelection.AddRange(
+                        filesInCurrentFolder.Where(fullPath => selectedFileFilter(fullPath))
+                    );
+
+                    //Scan all sub directories
+                    foreach (string subFolder in foldersInCurrentFolder)
+                    {
+                        selectedFolders.Push(subFolder);
+                    }
                 }
+
+                appModel.AddFiles(filenames.Concat(filesInSubFolderSelection).ToArray());
             }
         }
 
@@ -205,6 +239,7 @@ namespace HeaderTreeExplorer
             {
                 of.Filter = "VS Project Files (vcxproj)|*.vcxproj";
                 of.Title = "Select VS C++ Project";
+
                 if(of.ShowDialog() == DialogResult.OK)
                 {
                     appModel.IncludeAllHeadersWithinVSProject(of.FileName);

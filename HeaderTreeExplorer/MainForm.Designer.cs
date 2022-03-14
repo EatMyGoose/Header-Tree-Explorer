@@ -30,6 +30,7 @@
         {
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
+            this.btnImportVSProject = new System.Windows.Forms.Button();
             this.BtnDeleteAll = new System.Windows.Forms.Button();
             this.BtnLoadFile = new System.Windows.Forms.Button();
             this.label1 = new System.Windows.Forms.Label();
@@ -44,7 +45,6 @@
             this.btnIncludeDirectories = new System.Windows.Forms.Button();
             this.btnLibDirectories = new System.Windows.Forms.Button();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
-            this.btnImportVSProject = new System.Windows.Forms.Button();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.gbIncludeImpact.SuspendLayout();
@@ -56,7 +56,7 @@
             this.toolStrip1.ImageScalingSize = new System.Drawing.Size(28, 28);
             this.toolStrip1.Location = new System.Drawing.Point(0, 0);
             this.toolStrip1.Name = "toolStrip1";
-            this.toolStrip1.Size = new System.Drawing.Size(1256, 25);
+            this.toolStrip1.Size = new System.Drawing.Size(1256, 33);
             this.toolStrip1.TabIndex = 0;
             this.toolStrip1.Text = "toolStrip1";
             // 
@@ -76,6 +76,16 @@
             this.groupBox1.TabIndex = 1;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "Settings";
+            // 
+            // btnImportVSProject
+            // 
+            this.btnImportVSProject.Location = new System.Drawing.Point(383, 32);
+            this.btnImportVSProject.Name = "btnImportVSProject";
+            this.btnImportVSProject.Size = new System.Drawing.Size(172, 34);
+            this.btnImportVSProject.TabIndex = 4;
+            this.btnImportVSProject.Text = "Load .vcxproj";
+            this.btnImportVSProject.UseVisualStyleBackColor = true;
+            this.btnImportVSProject.Click += new System.EventHandler(this.btnImportVSProject_Click);
             // 
             // BtnDeleteAll
             // 
@@ -233,16 +243,6 @@
             this.groupBox3.TabIndex = 6;
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "Configure:";
-            // 
-            // btnImportVSProject
-            // 
-            this.btnImportVSProject.Location = new System.Drawing.Point(383, 32);
-            this.btnImportVSProject.Name = "btnImportVSProject";
-            this.btnImportVSProject.Size = new System.Drawing.Size(172, 34);
-            this.btnImportVSProject.TabIndex = 4;
-            this.btnImportVSProject.Text = "Load .vcxproj";
-            this.btnImportVSProject.UseVisualStyleBackColor = true;
-            this.btnImportVSProject.Click += new System.EventHandler(this.btnImportVSProject_Click);
             // 
             // MainForm
             // 
