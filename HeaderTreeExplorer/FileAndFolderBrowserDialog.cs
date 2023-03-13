@@ -32,10 +32,7 @@ namespace HeaderTreeExplorer
         private string currentFolder;
         FileSystemInfo[] currentFolderItems = new FileSystemInfo[] { }; //Unfiltered items within the currently selected folder
         FileSystemInfo[] displayedFilesAndDirectories = new FileSystemInfo[] {}; //Object indices will always maintain a 1-1 relationship with the listview
-
-        private const string defaultDir = @"C:\";
-        public string initialDirectory = String.Empty;
-
+        
         private Stack<string> folderHistory = new Stack<string>();
 
         public bool selectableFolders = false;
@@ -50,9 +47,25 @@ namespace HeaderTreeExplorer
 
         Regex currentFilterRegex = null; //null = no filter, 
 
-        public static bool IsDir(FileSystemInfo fs)
+        public FileAndFolderBrowserDialog()
         {
-            return Convert.ToBoolean(fs.Attributes & FileAttributes.Directory);
+            InitializeComponent();
+
+            //setup columns
+            lvDirectories.Columns.Add("Name");
+            lvDirectories.Columns.Add("Type"); //["File"|"Folder"]
+            lvDirectories.Columns.Add("Last Modified"); //Displayed format based on system settings
+
+            //Event registration
+            OnRowDoubleClicked += NavigateIntoClickedFolderInListView;
+
+            cbUseFilter.CheckedChanged += ReapplyFiltersAndUpdateListView;
+            cbFileFilter.SelectedIndexChanged += ReapplyFiltersAndUpdateListView;
+        }
+
+        public void SetInitialDirectory(string path)
+        {
+            currentFolder = path;
         }
 
         private Tuple<string, string[]>[] GetExtensionFilters(string format)
@@ -66,12 +79,12 @@ namespace HeaderTreeExplorer
             int maxPairLength = (tokenList.Length % 2 == 0) ? tokenList.Length : tokenList.Length - 1;
             for (int index = 0; index < maxPairLength; index += 2)
             {
-                string description = tokenList[index]; 
+                string description = tokenList[index];
                 string extensions = tokenList[index + 1];
 
                 string[] extensionList = extensions
                     .Split(';') //"*.*;*.csv;" => [*.*, *.csv]
-                    .Select(str => str.Split('.'))  
+                    .Select(str => str.Split('.'))
                     .Where(strPair => strPair.Length == 2)
                     .Select(strPair => "." + strPair[1].ToLower().Trim())
                     .ToArray();
@@ -81,78 +94,6 @@ namespace HeaderTreeExplorer
             return extensionFilters.ToArray();
         }
 
-        [DllImport("shell32.dll", ExactSpelling = true, CharSet = CharSet.Unicode)]
-        internal static extern bool SHGetPathFromIDListW(
-            IntPtr pidl,
-            [MarshalAs(UnmanagedType.LPTStr)]
-            StringBuilder pszPath);
-
-        private static string GetPathFromIDList(byte[] idList, int offset)
-        {
-            int nBytesToCopy = idList.Length - offset;
-
-            int buffer = Math.Max(nBytesToCopy, 520); 
-            var sb = new StringBuilder(buffer);
-
-            IntPtr ptr = Marshal.AllocHGlobal(idList.Length);
-            
-            Marshal.Copy(idList, offset, ptr, idList.Length - offset);
-
-            bool result = SHGetPathFromIDListW(ptr, sb);
-            Marshal.FreeHGlobal(ptr);
-
-            return result ? sb.ToString() : string.Empty;
-        }
-
-        public static string GetDefaultDir()
-        {
-            bool installedOSAboveVista = Environment.OSVersion.Version.Major >= 6;
-            string defaultFileBrowserDialogFolderRegKey = installedOSAboveVista ?
-                @"Software\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32\LastVisitedPidlMRU" :
-                @"Software\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32\LastVisitedMRU\";
-
-            var regValues = Registry.CurrentUser.OpenSubKey(defaultFileBrowserDialogFolderRegKey, false);
-
-            string currentAppName = System.AppDomain.CurrentDomain.FriendlyName;
-            int wCharAppNameLength = currentAppName.Length * 2;
-
-            foreach (string valueName in regValues.GetValueNames())
-            {
-                byte[] data = (byte[])regValues.GetValue(valueName);
-                if (data == null) continue;
-
-                string entryAppName = Encoding.Unicode.GetString(data, 0, wCharAppNameLength);
-
-                if(entryAppName == currentAppName)
-                {
-                    //Matching registry entry
-                    int offset = (entryAppName.Length + 1) * 2; //wchars + null terminator
-                    string lastAccessedFile = GetPathFromIDList(data, offset);
-
-                    return string.IsNullOrEmpty(lastAccessedFile) ? defaultDir : lastAccessedFile;
-                }
-            }
-
-            //No matching registry entry
-            return defaultDir;
-        }
-
-        public FileAndFolderBrowserDialog()
-        {
-            InitializeComponent();
-
-            //setup columns
-
-            lvDirectories.Columns.Add("Name");
-            lvDirectories.Columns.Add("Type"); //["File"|"Folder"]
-            lvDirectories.Columns.Add("Last Modified"); //Displayed format based on system settings
-
-            //Event registration
-            OnRowDoubleClicked += NavigateIntoClickedFolderInListView;
-
-            cbUseFilter.CheckedChanged += ReapplyFiltersAndUpdateListView;
-            cbFileFilter.SelectedIndexChanged += ReapplyFiltersAndUpdateListView;
-        }
 
         private void FileAndFolderBrowserDialog_Load(object sender, EventArgs e)
         {
@@ -181,9 +122,13 @@ namespace HeaderTreeExplorer
             cbFileFilter.SelectedIndex = 0; //guaranteed to have at least one item
 
             //Update listview
-            initialDirectory = string.IsNullOrWhiteSpace(initialDirectory) ? GetDefaultDir() : initialDirectory;
+            string defaultDir = Helpers.GetDefaultDir();
 
-            bool couldLoadInitialDir = TryNavigateIntoFolder(initialDirectory, false);
+            currentFolder = string.IsNullOrWhiteSpace(currentFolder) ?
+                defaultDir :
+                currentFolder;
+
+            bool couldLoadInitialDir = TryNavigateIntoFolder(currentFolder, false);
 
             //If the requested directory cannot be read, load C:\ instead
             if (!couldLoadInitialDir)
@@ -192,13 +137,13 @@ namespace HeaderTreeExplorer
 
                 if (couldLoadDefaultDir)
                 {
-                    MessageBox.Show($"Unable to read \"{initialDirectory}\", loading \"{defaultDir}\" instead.", "Unable to read directory",
+                    MessageBox.Show($"Unable to read \"{currentFolder}\", loading \"{defaultDir}\" instead.", "Unable to read directory",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Asterisk);
                 }
                 else //Leave listview unpopulated.
                 {
-                    MessageBox.Show($"Unable to read \"{initialDirectory}\" or \"{defaultDir}\"", "Unable to read directory",
+                    MessageBox.Show($"Unable to read \"{currentFolder}\" or \"{defaultDir}\"", "Unable to read directory",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Asterisk);
                 }
@@ -212,7 +157,7 @@ namespace HeaderTreeExplorer
             int[] selectedIndices = lvDirectories.SelectedIndices.Cast<int>().ToArray();
             return selectedIndices
                 .Select(index => displayedFilesAndDirectories[index])
-                .Where(fileInfo => IsDir(fileInfo))
+                .Where(fileInfo => Helpers.IsDir(fileInfo))
                 .Select(fileInfo => fileInfo.FullName)
                 .ToArray();
         }
@@ -222,7 +167,7 @@ namespace HeaderTreeExplorer
             int[] selectedIndices = lvDirectories.SelectedIndices.Cast<int>().ToArray();
             return selectedIndices
                 .Select(index => displayedFilesAndDirectories[index])
-                .Where(fileInfo => !IsDir(fileInfo))
+                .Where(fileInfo => !Helpers.IsDir(fileInfo))
                 .Select(fileInfo => fileInfo.FullName)
                 .ToArray();
         }
@@ -261,7 +206,7 @@ namespace HeaderTreeExplorer
         {
             FileSystemInfo clickedItem = displayedFilesAndDirectories[index];
 
-            if (!IsDir(clickedItem)) return; //double clicked on file, ignore
+            if (!Helpers.IsDir(clickedItem)) return; //double clicked on file, ignore
 
             //Retrieve items within clicked subfolder
             string subfolderPath = clickedItem.FullName;
@@ -277,7 +222,6 @@ namespace HeaderTreeExplorer
                 return;
             }
         }
-
 
         private void tbCurrentDirectory_Leave(object sender, EventArgs e)
         {
@@ -333,7 +277,7 @@ namespace HeaderTreeExplorer
             return rawSelection
                 .Where(fs =>
                 {
-                    if (IsDir(fs)) return true; //Only filter files
+                    if (Helpers.IsDir(fs)) return true; //Only filter files
 
                     string fileExtension = Path.GetExtension(fs.Name).ToLower().Trim();
 
@@ -349,7 +293,7 @@ namespace HeaderTreeExplorer
                 {
                     if (regPattern == null) return true;
 
-                    if (IsDir(fs) && !applyToFolders) return true;
+                    if (Helpers.IsDir(fs) && !applyToFolders) return true;
 
                     return regPattern.IsMatch(fs.Name);
                 })
@@ -496,7 +440,7 @@ namespace HeaderTreeExplorer
             {
                 string[] fields = new string[]{
                     fsInfo.Name,
-                    IsDir(fsInfo) ? "Folder" : "File",
+                    Helpers.IsDir(fsInfo) ? "Folder" : "File",
                     fsInfo.LastWriteTime.ToString()
                 };
 
@@ -545,7 +489,7 @@ namespace HeaderTreeExplorer
                 case (int)ColumnIndex.Type:
                     sortCondition = new FileSystemInfoComparer((FileSystemInfo fs1, FileSystemInfo fs2) =>
                     {
-                        int relativeIntOrder = Convert.ToInt32(IsDir(fs1)) - Convert.ToInt32(IsDir(fs2));
+                        int relativeIntOrder = Convert.ToInt32(Helpers.IsDir(fs1)) - Convert.ToInt32(Helpers.IsDir(fs2));
                         return (sortedByAscending ? 1 : -1) * relativeIntOrder;
                     });
                     break;

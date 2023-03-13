@@ -1,0 +1,8 @@
+.vs
+HeaderTreeExplorer/bin/release
+HeaderTreeExplorer/obj
+HeaderTreeExplorer/GraphRenderer
+
+HeaderTreeExplorer/bin/debug/*.config
+
+
