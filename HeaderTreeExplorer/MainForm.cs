@@ -20,6 +20,8 @@ namespace HeaderTreeExplorer
 
         AppModel appModel;
 
+        FileAndFolderBrowserDialog loadFilesAndFoldersDialog;
+
         public enum IncludeImpactCriteria
         {
             numFiles,
@@ -31,6 +33,20 @@ namespace HeaderTreeExplorer
             InitializeComponent();
 
             appModel = new AppModel(this);
+
+            loadFilesAndFoldersDialog = new FileAndFolderBrowserDialog
+            {
+                fileFilters = string.Join("|", new string[] {
+                    "C++ header files(*.h, *.hpp)|*.h;*.hpp",
+                    "C++ implementation files(*.cpp)|*.cpp",
+                    "C++ header and impl files(*.cpp, *.h, *.hpp)|*.cpp;*.h;*.hpp",
+                    "All Files(*.*)|*.*",
+                }),
+
+                selectableFiles = true,
+                selectableFolders = true,
+                multiSelect = true
+            };
 
             cbReportType.SelectedIndexChanged += (object sender, EventArgs e) => UpdateIncludeImpactGroupboxVisibility(); 
             cbReportType.SelectedIndex = 0; //Frequency Report
@@ -98,17 +114,6 @@ namespace HeaderTreeExplorer
 
         private void BtnLoadFile_Click(object sender, EventArgs e)
         {
-            FileAndFolderBrowserDialog loadFilesAndFoldersDialog = new FileAndFolderBrowserDialog();
-            loadFilesAndFoldersDialog.fileFilters = string.Join("|", new string[] {
-                "C++ header files(*.h, *.hpp)|*.h;*.hpp",
-                "C++ header and impl files(*.cpp, *.h, *.hpp)|*.cpp;*.h;*.hpp",
-                "All Files(*.*)|*.*",
-            });
-
-            loadFilesAndFoldersDialog.selectableFiles = true;
-            loadFilesAndFoldersDialog.selectableFolders = true;
-            loadFilesAndFoldersDialog.multiSelect = true;
-
             if (loadFilesAndFoldersDialog.ShowDialog() == DialogResult.OK)
             {
                 string[] filenames = loadFilesAndFoldersDialog.GetSelectedFiles();

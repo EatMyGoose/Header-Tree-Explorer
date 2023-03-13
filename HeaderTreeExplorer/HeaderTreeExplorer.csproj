@@ -58,6 +58,9 @@
     <Compile Include="FileAndFolderBrowserDialog.Designer.cs">
       <DependentUpon>FileAndFolderBrowserDialog.cs</DependentUpon>
     </Compile>
+    <Compile Include="FileAndFolderBrowserDialogHelper.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="FreqencyReport.cs" />
     <Compile Include="GraphVisualizationReport.cs" />
     <Compile Include="MainForm.cs">
