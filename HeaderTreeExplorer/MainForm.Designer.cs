@@ -45,6 +45,7 @@
             this.btnIncludeDirectories = new System.Windows.Forms.Button();
             this.btnLibDirectories = new System.Windows.Forms.Button();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
+            this.btnDeleteSelection = new System.Windows.Forms.Button();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.gbIncludeImpact.SuspendLayout();
@@ -56,7 +57,7 @@
             this.toolStrip1.ImageScalingSize = new System.Drawing.Size(28, 28);
             this.toolStrip1.Location = new System.Drawing.Point(0, 0);
             this.toolStrip1.Name = "toolStrip1";
-            this.toolStrip1.Size = new System.Drawing.Size(1256, 33);
+            this.toolStrip1.Size = new System.Drawing.Size(1256, 25);
             this.toolStrip1.TabIndex = 0;
             this.toolStrip1.Text = "toolStrip1";
             // 
@@ -65,6 +66,7 @@
             this.groupBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.groupBox1.Controls.Add(this.btnDeleteSelection);
             this.groupBox1.Controls.Add(this.btnImportVSProject);
             this.groupBox1.Controls.Add(this.BtnDeleteAll);
             this.groupBox1.Controls.Add(this.BtnLoadFile);
@@ -79,7 +81,7 @@
             // 
             // btnImportVSProject
             // 
-            this.btnImportVSProject.Location = new System.Drawing.Point(383, 32);
+            this.btnImportVSProject.Location = new System.Drawing.Point(210, 33);
             this.btnImportVSProject.Name = "btnImportVSProject";
             this.btnImportVSProject.Size = new System.Drawing.Size(172, 34);
             this.btnImportVSProject.TabIndex = 4;
@@ -90,9 +92,9 @@
             // BtnDeleteAll
             // 
             this.BtnDeleteAll.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.BtnDeleteAll.Location = new System.Drawing.Point(561, 32);
+            this.BtnDeleteAll.Location = new System.Drawing.Point(388, 32);
             this.BtnDeleteAll.Name = "BtnDeleteAll";
-            this.BtnDeleteAll.Size = new System.Drawing.Size(139, 36);
+            this.BtnDeleteAll.Size = new System.Drawing.Size(139, 35);
             this.BtnDeleteAll.TabIndex = 3;
             this.BtnDeleteAll.Text = "Delete All";
             this.BtnDeleteAll.UseVisualStyleBackColor = true;
@@ -123,10 +125,12 @@
             this.tvSelectedFiles.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.tvSelectedFiles.CheckBoxes = true;
             this.tvSelectedFiles.Location = new System.Drawing.Point(6, 74);
             this.tvSelectedFiles.Name = "tvSelectedFiles";
             this.tvSelectedFiles.Size = new System.Drawing.Size(839, 536);
             this.tvSelectedFiles.TabIndex = 0;
+            this.tvSelectedFiles.AfterCheck += new System.Windows.Forms.TreeViewEventHandler(this.tvSelectedFiles_AfterCheck);
             // 
             // groupBox2
             // 
@@ -244,6 +248,16 @@
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "Configure:";
             // 
+            // btnDeleteSelection
+            // 
+            this.btnDeleteSelection.Location = new System.Drawing.Point(532, 32);
+            this.btnDeleteSelection.Name = "btnDeleteSelection";
+            this.btnDeleteSelection.Size = new System.Drawing.Size(169, 35);
+            this.btnDeleteSelection.TabIndex = 5;
+            this.btnDeleteSelection.Text = "Delete Selection";
+            this.btnDeleteSelection.UseVisualStyleBackColor = true;
+            this.btnDeleteSelection.Click += new System.EventHandler(this.btnDeleteSelection_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(11F, 24F);
@@ -287,6 +301,7 @@
         private System.Windows.Forms.RadioButton rbIncludeImpactLOC;
         private System.Windows.Forms.RadioButton rbIncludeImpactFiles;
         private System.Windows.Forms.Button btnImportVSProject;
+        private System.Windows.Forms.Button btnDeleteSelection;
     }
 }
 

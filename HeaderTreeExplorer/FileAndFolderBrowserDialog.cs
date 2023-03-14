@@ -18,12 +18,16 @@ namespace HeaderTreeExplorer
 {
     public partial class FileAndFolderBrowserDialog : Form
     {
+
+        #region private variables
         private enum ColumnIndex : int
         {
             Name = 0,
             Type = 1,
             LastModified = 2
+
         }
+
         bool[] ColumnSortedByAscending = { false, false, false }; //For listview sorting, each element corresponds to the column index specified above
 
         public delegate void RowDoubleClickedHandler(int index);
@@ -35,17 +39,21 @@ namespace HeaderTreeExplorer
         
         private Stack<string> folderHistory = new Stack<string>();
 
+        
+        //(displayedTitle:string, extensions(including the dot):string[])
+        Tuple<string, string[]>[] extensionFilters = new Tuple<string, string[]>[] { };
+        Tuple<string, string[]>[] defaultExtensionFilter = new Tuple<string, string[]>[] { Tuple.Create("All Files(*.*)", new string[] { "*" }) };
+
+        Regex currentFilterRegex = null; //null = no filter
+        #endregion
+
+        #region public variables
         public bool selectableFolders = false;
         public bool selectableFiles = true;
         public bool multiSelect = true;
 
         public string fileFilters = "All Files(*.*)|*.*";
-
-        //(displayedTitle:string, extensions(including the dot):string[])
-        private Tuple<string, string[]>[] extensionFilters = new Tuple<string, string[]>[] { };
-        private Tuple<string, string[]>[] defaultExtensionFilter = new Tuple<string, string[]>[] { Tuple.Create("All Files(*.*)", new string[] { "*" }) };
-
-        Regex currentFilterRegex = null; //null = no filter, 
+        #endregion 
 
         public FileAndFolderBrowserDialog()
         {
@@ -59,7 +67,7 @@ namespace HeaderTreeExplorer
             //Event registration
             OnRowDoubleClicked += NavigateIntoClickedFolderInListView;
 
-            cbUseFilter.CheckedChanged += ReapplyFiltersAndUpdateListView;
+            //cbUseFilter.CheckedChanged += ReapplyFiltersAndUpdateListView;
             cbFileFilter.SelectedIndexChanged += ReapplyFiltersAndUpdateListView;
         }
 
@@ -67,34 +75,8 @@ namespace HeaderTreeExplorer
         {
             currentFolder = path;
         }
-
-        private Tuple<string, string[]>[] GetExtensionFilters(string format)
-        {
-            string[] tokenList = format.Split('|');
-
-            //(displayedTitle:string, extensions(without the dot):string[])
-            var extensionFilters = new List<Tuple<string, string[]>>();
-
-            //Must process in pairs, only iterate up to the highest set of pairs
-            int maxPairLength = (tokenList.Length % 2 == 0) ? tokenList.Length : tokenList.Length - 1;
-            for (int index = 0; index < maxPairLength; index += 2)
-            {
-                string description = tokenList[index];
-                string extensions = tokenList[index + 1];
-
-                string[] extensionList = extensions
-                    .Split(';') //"*.*;*.csv;" => [*.*, *.csv]
-                    .Select(str => str.Split('.'))
-                    .Where(strPair => strPair.Length == 2)
-                    .Select(strPair => "." + strPair[1].ToLower().Trim())
-                    .ToArray();
-
-                extensionFilters.Add(new Tuple<string, string[]>(description, extensionList));
-            }
-            return extensionFilters.ToArray();
-        }
-
-
+        
+        //Initial form load
         private void FileAndFolderBrowserDialog_Load(object sender, EventArgs e)
         {
             if(!selectableFolders && !selectableFiles)
@@ -112,7 +94,7 @@ namespace HeaderTreeExplorer
             lvDirectories.MultiSelect = multiSelect;
 
             //Populate file-filters
-            var parsedExtensionFilters = GetExtensionFilters(fileFilters);
+            var parsedExtensionFilters = Helpers.GetExtensionFilters(fileFilters);
             extensionFilters = parsedExtensionFilters.Length > 0? parsedExtensionFilters : defaultExtensionFilter;
 
             foreach(string filterDescription in extensionFilters.Select(pair => pair.Item1))
@@ -187,15 +169,15 @@ namespace HeaderTreeExplorer
         //If unsuccessful, the listview remains unchanged & returns false
         private bool TryNavigateIntoFolder(string path, bool appendPrevPathToHistory)
         {
-            Tuple<bool, FileSystemInfo[]> subFolderInfo = TryListDirectory(path);
+            Tuple<bool, FileSystemInfo[]> subFolderInfo = Helpers.TryListDirectory(path);
             bool readSuccessful = subFolderInfo.Item1;
 
             if (!readSuccessful) return false;
 
-
             if(appendPrevPathToHistory) folderHistory.Push(currentFolder);
-     
-            UpdateListView(subFolderInfo.Item2, path);
+
+            Func<FileSystemInfo[], FileSystemInfo[]> activeFilters = GetActiveFileExtensionAndRegexFilters();
+            UpdateListView(subFolderInfo.Item2, path, activeFilters);
 
             EnableBackButtonIfNonEmptyHistory();
             
@@ -272,67 +254,34 @@ namespace HeaderTreeExplorer
             };
         }
 
-        private FileSystemInfo[] ApplyFileExtensionFilters(FileSystemInfo[] rawSelection, string[] selectedExtensions)
+        private Func<FileSystemInfo[], FileSystemInfo[]> GetActiveFileExtensionAndRegexFilters()
         {
-            return rawSelection
-                .Where(fs =>
-                {
-                    if (Helpers.IsDir(fs)) return true; //Only filter files
+            return (FileSystemInfo[] originalList) =>
+            {
+                //Apply file extension filters first
+                string[] selectedExtensionFilters = extensionFilters[cbFileFilter.SelectedIndex].Item2;
+                FileSystemInfo[] selectionAfterFileExtensionFilters = Helpers.ApplyFileExtensionFilters(originalList, selectedExtensionFilters);
 
-                    string fileExtension = Path.GetExtension(fs.Name).ToLower().Trim();
+                //Then apply regex filters
+                Regex reg = cbUseFilter.Checked ? currentFilterRegex : null; //Disable regex filtering if not enabled
+                bool applyToFolders = cbRegexAppliedToFolder.Checked;
+                FileSystemInfo[] selectionAfterRegexFilter = Helpers.ApplyRegexFilters(selectionAfterFileExtensionFilters, reg, applyToFolders);
 
-                    return selectedExtensions.Any(filter => filter == ".*" || filter == fileExtension); 
-                })
-                .ToArray();
+                return selectionAfterRegexFilter;
+            };
         }
 
-        private FileSystemInfo[] ApplyRegexFilters(FileSystemInfo[] rawSelection, Regex regPattern, bool applyToFolders)
-        {
-            return rawSelection
-                .Where(fs =>
-                {
-                    if (regPattern == null) return true;
-
-                    if (Helpers.IsDir(fs) && !applyToFolders) return true;
-
-                    return regPattern.IsMatch(fs.Name);
-                })
-                .ToArray();
-        }
-
-        private void UpdateListView(FileSystemInfo[] directories, string currentDirectory)
+        private void UpdateListView(FileSystemInfo[] directories, string currentDirectory, Func<FileSystemInfo[], FileSystemInfo[]> filter)
         {
             //Update displayed directory
             string fullPath = Path.GetFullPath(currentDirectory); 
             currentFolder = fullPath;
             tbCurrentDirectory.Text = fullPath;
 
-            //Populate listview
-            lvDirectories.Items.Clear();
-
-            //Apply file extension filters first
-            string[] selectedExtensionFilters = extensionFilters[cbFileFilter.SelectedIndex].Item2;
-            var selectionAfterFileFilters = ApplyFileExtensionFilters(directories, selectedExtensionFilters);
-
-            //Then apply regex filters
-            Regex reg = cbUseFilter.Checked ? currentFilterRegex : null; //Disable regex filtering if not enabled
-            bool applyToFolders = cbRegexAppliedToFolder.Checked; 
-            var selectionAfterRegexFilter = ApplyRegexFilters(selectionAfterFileFilters, reg , applyToFolders);
-
-            RepopulateListView(selectionAfterRegexFilter);
-        }
-
-        private static Tuple<bool, FileSystemInfo[]> TryListDirectory(string dirPath)
-        {
-            if(!Directory.Exists(dirPath))
-            {
-                return Tuple.Create(false, new FileSystemInfo[]{ });
-            }
-
-            var dirInfo = new DirectoryInfo(dirPath);
-            FileSystemInfo[] fileInfo = dirInfo.GetFileSystemInfos();
-
-            return Tuple.Create(true, fileInfo);
+            FileSystemInfo[] filteredSelection = filter == null ? directories : filter(directories);
+            
+            //Then repopulate the listview
+            RepopulateListView(filteredSelection);
         }
 
         private void lvDirectories_DoubleClick(object sender, EventArgs e)
@@ -390,7 +339,7 @@ namespace HeaderTreeExplorer
             tbRegexFilter.Enabled = regexFilterEnabled;
             cbRegexAppliedToFolder.Enabled = regexFilterEnabled;
 
-            TryNavigateIntoFolder(currentFolder, false); //refresh view
+            TryNavigateIntoFolder(currentFolder, false); //Reapply filters by refreshing view
         }
 
         private void ReapplyFiltersAndUpdateListView(object sender, EventArgs e)
@@ -432,6 +381,8 @@ namespace HeaderTreeExplorer
         //Updates "displayedFilesAndDirectories" attribute.
         private void RepopulateListView(FileSystemInfo[] fileList)
         {
+            lvDirectories.SuspendLayout();
+
             displayedFilesAndDirectories = fileList;
 
             lvDirectories.Items.Clear();
@@ -449,6 +400,8 @@ namespace HeaderTreeExplorer
             }
 
             lvDirectories.AutoResizeColumns(ColumnHeaderAutoResizeStyle.ColumnContent);
+
+            lvDirectories.ResumeLayout();
         }
 
         private class FileSystemInfoComparer : IComparer<FileSystemInfo>
