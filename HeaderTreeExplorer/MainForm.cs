@@ -81,28 +81,30 @@ namespace HeaderTreeExplorer
 
             //Build the drive tree.
             const string driveRootDefaultValue = "";
-            TNode<string> driveRoot = TNode<string>.GenerateTrie(fragmentedPaths, driveRootDefaultValue);
+            TTrieNode<string> driveRoot = TTrieNode<string>.GenerateTrie(fragmentedPaths, newPaths.ToList(), driveRootDefaultValue);
 
             //Condense Tree
-            TNode<string> condensed = TNode<string>.CondenseTree(driveRoot, (string first, string second) => Path.Combine(first, second));
+            TTrieNode<string> condensed = TTrieNode<string>.CondenseTree(driveRoot, (string first, string second) => Path.Combine(first, second));
 
             //Copy to TreeNode
             TreeNode treeViewRoot = new TreeNode(condensed.nodeValue);
 
-            Queue<TNode<string>> srcFrontier = new Queue<TNode<string>>();
+            Queue<TTrieNode<string>> srcFrontier = new Queue<TTrieNode<string>>();
             Queue<TreeNode> destFrontier = new Queue<TreeNode>();
 
             srcFrontier.Enqueue(condensed);
             destFrontier.Enqueue(treeViewRoot);
             while(srcFrontier.Count > 0)
             {
-                TNode<string> srcNode = srcFrontier.Dequeue();
+                TTrieNode<string> srcNode = srcFrontier.Dequeue();
                 TreeNode destNode = destFrontier.Dequeue();
 
                 //Generate children
-                foreach(TNode<string> child in srcNode.children)
+                foreach(TTrieNode<string> child in srcNode.children)
                 {
                     TreeNode newDestChild = destNode.Nodes.Add(child.nodeValue);
+                    newDestChild.Name = child.isLeaf ? child.leafValue : "";
+                    
                     srcFrontier.Enqueue(child);
                     destFrontier.Enqueue(newDestChild);
                 }
@@ -112,42 +114,47 @@ namespace HeaderTreeExplorer
             tvSelectedFiles.Nodes.Add(treeViewRoot);
         }
 
+        private static List<string> GetAllNestedFilesInSubfolders(IEnumerable<string> subFolders, Func<string, bool> fileFilter)
+        {
+            List<string> filesInSubfolders = new List<string>();
+
+            Stack<string> unprocessedFolders = new Stack<string>(subFolders);
+            while(unprocessedFolders.Count() > 0)
+            {
+                string currentFolder = unprocessedFolders.Pop();
+
+                string[] files = new string[] { };
+                string[] subfolders = new string[] { };
+                try
+                {
+                    files = Directory.GetFiles(currentFolder);
+                    subfolders = Directory.GetDirectories(currentFolder);
+                }
+                catch
+                {
+                    //Ignore.
+                }
+
+                filesInSubfolders.AddRange(
+                    files.Where(fullPath => fileFilter(fullPath))
+                );
+            }
+            return filesInSubfolders;
+        }
+
         private void BtnLoadFile_Click(object sender, EventArgs e)
         {
             if (loadFilesAndFoldersDialog.ShowDialog() == DialogResult.OK)
             {
                 string[] filenames = loadFilesAndFoldersDialog.GetSelectedFiles();
-                Stack<string> selectedFolders = new Stack<string>(loadFilesAndFoldersDialog.GetSelectedFolders());
-                List<string> filesInSubFolderSelection = new List<string>();
-                Func<string, bool> selectedFileFilter = loadFilesAndFoldersDialog.GetCurrentlySelectedExtensionFilter();
-                while (selectedFolders.Count() > 0)
-                {
-                    string currentFolder = selectedFolders.Pop();
-
-                    string[] filesInCurrentFolder = new string[] { };
-                    string[] foldersInCurrentFolder = new string[] { };
-                    try
-                    {
-                        filesInCurrentFolder = Directory.GetFiles(currentFolder);
-                        foldersInCurrentFolder = Directory.GetDirectories(currentFolder);
-                    }
-                    catch
-                    {
-                        //Ignore.
-                    }
-
-                    filesInSubFolderSelection.AddRange(
-                        filesInCurrentFolder.Where(fullPath => selectedFileFilter(fullPath))
+                //For any selected subfolders, just recursively scan through them and find all
+                //files matching the filename filters that were specified
+                List<string> filesInSelectedDirectories = GetAllNestedFilesInSubfolders(
+                        loadFilesAndFoldersDialog.GetSelectedFolders(),
+                        loadFilesAndFoldersDialog.GetCurrentlySelectedExtensionFilter()
                     );
-
-                    //Scan all sub directories
-                    foreach (string subFolder in foldersInCurrentFolder)
-                    {
-                        selectedFolders.Push(subFolder);
-                    }
-                }
-
-                appModel.AddFiles(filenames.Concat(filesInSubFolderSelection).ToArray());
+                
+                appModel.AddFiles(filenames.Concat(filesInSelectedDirectories).ToArray());
             }
         }
 
@@ -250,6 +257,48 @@ namespace HeaderTreeExplorer
                     appModel.IncludeAllHeadersWithinVSProject(of.FileName);
                 }
             }
+        }
+
+        private static void RecursivelyCheckChildrenNodes(TreeNode node, bool isChecked)
+        {
+            foreach(TreeNode childNode in node.Nodes)
+            {
+                childNode.Checked = isChecked;
+                RecursivelyCheckChildrenNodes(childNode, isChecked);
+            }
+        }
+        
+        private void tvSelectedFiles_AfterCheck(object sender, TreeViewEventArgs e)
+        {
+            if(e.Action != TreeViewAction.Unknown)
+
+            tvSelectedFiles.BeginUpdate();
+            RecursivelyCheckChildrenNodes(e.Node, e.Node.Checked);
+            tvSelectedFiles.EndUpdate();
+        }
+        
+        void GetAllSelectedFilesInListview(TreeNode root, ref List<string> files)
+        {
+            if(root.Checked)
+            {
+                files.Add(root.Name);
+            }
+
+            foreach(TreeNode childNode in root.Nodes)
+            {
+                GetAllSelectedFilesInListview(childNode, ref files);
+            }
+        }
+
+        private void btnDeleteSelection_Click(object sender, EventArgs e)
+        {
+            if (tvSelectedFiles.Nodes.Count == 0) return;
+
+            List<string> selectedFiles = new List<string>();
+
+            GetAllSelectedFilesInListview(tvSelectedFiles.Nodes[0], ref selectedFiles);
+
+            appModel.DeleteFileSelection(selectedFiles.ToArray());
         }
     }
 }

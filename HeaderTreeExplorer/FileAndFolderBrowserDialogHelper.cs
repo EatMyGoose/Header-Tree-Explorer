@@ -7,6 +7,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using System.Windows.Forms;
+using System.Text.RegularExpressions;
 
 namespace HeaderTreeExplorer
 {
@@ -75,6 +76,76 @@ namespace HeaderTreeExplorer
 
                 //No matching registry entry
                 return defaultDir;
+            }
+
+            public static Tuple<bool, FileSystemInfo[]> TryListDirectory(string dirPath)
+            {
+                if (!Directory.Exists(dirPath))
+                {
+                    return Tuple.Create(false, new FileSystemInfo[] { });
+                }
+
+                var dirInfo = new DirectoryInfo(dirPath);
+                FileSystemInfo[] fileInfo = dirInfo.GetFileSystemInfos();
+
+                return Tuple.Create(true, fileInfo);
+            }
+
+            public static FileSystemInfo[] ApplyFileExtensionFilters(FileSystemInfo[] rawSelection, string[] selectedExtensions)
+            {
+                return rawSelection
+                    .Where(fs =>
+                    {
+                        if (Helpers.IsDir(fs)) return true; //Only filter files
+
+                    string fileExtension = Path.GetExtension(fs.Name).ToLower().Trim();
+
+                        return selectedExtensions.Any(filter => filter == ".*" || filter == fileExtension);
+                    })
+                    .ToArray();
+            }
+
+            public static FileSystemInfo[] ApplyRegexFilters(FileSystemInfo[] rawSelection, Regex regPattern, bool applyToFolders)
+            {
+                return rawSelection
+                    .Where(fs =>
+                    {
+                        if (regPattern == null) return true;
+
+                        if (Helpers.IsDir(fs) && !applyToFolders) return true;
+
+                        return regPattern.IsMatch(fs.Name);
+                    })
+                    .ToArray();
+            }
+
+            //Converts the windows file extension format filters (i.e. "c++ files(*.cpp,*.h)|*.cpp;*.h"
+            //into a tuple containing the description and array of listed filename extensions 
+            //e.g "c++ files(*.cpp,*.h)|*.cpp;*.h" => ("c++ files(*.cpp,*.h)", [".cpp", ".h"])
+            public static Tuple<string, string[]>[] GetExtensionFilters(string format)
+            {
+                string[] tokenList = format.Split('|');
+
+                //(displayedTitle:string, extensions(without the dot):string[])
+                var extensionFilters = new List<Tuple<string, string[]>>();
+
+                //Must process in pairs, only iterate up to the highest set of pairs
+                int maxPairLength = (tokenList.Length % 2 == 0) ? tokenList.Length : tokenList.Length - 1;
+                for (int index = 0; index < maxPairLength; index += 2)
+                {
+                    string description = tokenList[index];
+                    string extensions = tokenList[index + 1];
+
+                    string[] extensionList = extensions
+                        .Split(';') //"*.*;*.csv;" => [*.*, *.csv]
+                        .Select(str => str.Split('.'))
+                        .Where(strPair => strPair.Length == 2)
+                        .Select(strPair => "." + strPair[1].ToLower().Trim())
+                        .ToArray();
+
+                    extensionFilters.Add(new Tuple<string, string[]>(description, extensionList));
+                }
+                return extensionFilters.ToArray();
             }
         }
     }
