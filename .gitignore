@@ -6,3 +6,4 @@ HeaderTreeExplorer/GraphRenderer
 HeaderTreeExplorer/bin/debug/*.config
 
 bin/
+HeaderTreeExplorer/bin/
