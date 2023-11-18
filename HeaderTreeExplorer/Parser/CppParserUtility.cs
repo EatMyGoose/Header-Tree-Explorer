@@ -362,7 +362,7 @@ namespace HeaderTreeExplorer.Parser
                         //Progressively add parent directories to the filenames until they are all unique (if possible)
                         while (!AllElementsAreUnique(diffentiatableSet.Select(fullPath => abbreviatedNamesDict[fullPath])))
                         {
-                            foreach(string fullPath in diffentiatableSet)
+                            foreach(string fullPath in diffentiatableSet.ToList())
                             {
                                 string prevAbbr = abbreviatedNamesDict[fullPath]; //i.e. folder1/file.h
                                 string withAdditionalParent = PrependNextParentDirToPath(prevAbbr, fullPath); //i.e. folder2/folder1/file.h
